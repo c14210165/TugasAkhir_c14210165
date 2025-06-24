@@ -59,6 +59,10 @@ class RequestController extends Controller
         } else {
             // Pengguna biasa hanya melihat permohonannya sendiri
             $query->where('requester_id', $user->id);
+            
+            if ($request->has('status')) {
+                $query->where('status', $request->query('status'));
+            }
         }
 
         // --- FILTER SEKUNDER DARI TAB FRONTEND ---
@@ -113,7 +117,7 @@ class RequestController extends Controller
         $loan->load('createdBy:id,role');
         // ------------------------------------
 
-        $user = auth()->user();
+        $user = Auth::user();
         $nextStatus = null;
         $approverField = null;
         $updateData = [];
@@ -173,7 +177,7 @@ class RequestController extends Controller
     {
         // Logika untuk decline tidak perlu serumit approve, karena bisa menolak di tahap mana saja.
         // Anda hanya perlu memastikan user yang login punya hak (misal: TU atau PTIK).
-        $user = auth()->user();
+        $user = Auth::user();
 
         if (!in_array($user->role, [UserRole::TU, UserRole::PTIK])) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses.'], 403);
@@ -196,7 +200,7 @@ class RequestController extends Controller
     public function cancel(Loan $loan)
     {
         // Hanya user yang membuat yang bisa membatalkan, dan hanya jika masih pending
-        if (auth()->id() !== $loan->created_by_id) {
+        if (Auth::id() !== $loan->created_by_id) {
             return response()->json(['message' => 'Anda tidak bisa membatalkan permohonan orang lain.'], 403);
         }
         if (!in_array($loan->status, [LoanStatus::PENDING_UNIT, LoanStatus::PENDING_PTIK])) {

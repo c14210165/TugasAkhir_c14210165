@@ -85,7 +85,7 @@ class ReturnController extends Controller
                 $loan->update([
                     'status' => LoanStatus::COMPLETED,
                     'returned_at' => now(), // Catat waktu pengembalian
-                    'checked_in_by_id' => auth()->id(),
+                    'checked_in_by_id' => Auth::id(),
                 ]);
 
                 // Langkah B: Update status Barang kembali menjadi AVAILABLE

@@ -1,37 +1,43 @@
 <template>
   <div class="p-6 bg-white shadow-md rounded-md">
-    <div class="flex justify-between items-center mb-4 border-b">
-      <div class="flex">
-        <button @click="filterByType('Semua')"
-                :class="filters.type === 'Semua' ? 'border-b-4 border-blue-500 text-blue-600' : 'text-gray-600'"
-                class="px-6 py-3 hover:text-blue-500 transition capitalize">
-          Semua
+    <div class="flex justify-between items-center mb-4">
+      <div class="border-b border-gray-200">
+      <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+        <button v-for="tab in tabs" :key="tab.status" @click="filterByStatus(tab.status)"
+                :class="filters.status === tab.status ? 'border-b-4 border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 capitalize">
+          {{ tab.name }}
         </button>
-        <button v-for="tab in ['Laptop', 'Projector', 'Camera']" :key="tab" @click="filterByType(tab)"
-                :class="filters.type === tab ? 'border-b-4 border-blue-500 text-blue-600' : 'text-gray-600'"
-                class="px-6 py-3 hover:text-blue-500 transition capitalize">
-          {{ tab }}
-        </button>
+      </nav>
       </div>
-      <div>
-        <button @click="openNewRequestModal"
+        <div>
+            <button @click="openNewRequestModal"
                 class="px-3 py-1 border border-blue-500 text-blue-500 rounded hover:bg-blue-500 hover:text-white transition">
-          + Buat Permohonan
-        </button>
-      </div>
+              + Buat Permohonan
+            </button>
+        </div>
     </div>
     
-    <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
-      <div class="flex items-center gap-2">
-        <label class="mr-2">Tampilkan</label>
-        <select v-model="filters.perPage" class="border border-gray-300 rounded px-2 py-1">
-          <option v-for="size in [5, 10, 25, 50]" :key="size" :value="size">{{ size }}</option>
-        </select>
-        <span class="ml-2">data</span>
-      </div>
-      <div>
-        <input type="text" v-model="filters.search" placeholder="Cari pemohon atau barang..." class="border border-gray-300 rounded-md px-3 py-2 w-64" />
-      </div>
+    
+    <div class="flex justify-between items-center my-4 flex-wrap gap-4">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-gray-700">Filter Tipe:</span>
+                <div class="flex items-center bg-gray-100 p-1 rounded-lg">
+                     <button @click="filterByType('Semua')" :class="filters.type === 'Semua' ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-200'" class="px-3 py-1 text-sm rounded-md transition-all">Semua</button>
+                     <button v-for="type in itemTypeOptions" :key="type.value" @click="filterByType(type.value)" :class="filters.type === type.value ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-200'" class="px-3 py-1 text-sm rounded-md transition-all capitalize">{{ type.label }}</button>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="mr-2 text-sm">Tampilkan</label>
+                <select v-model="filters.perPage" class="border border-gray-300 rounded px-2 py-1 text-sm">
+                  <option v-for="size in [5, 10, 25, 50]" :key="size" :value="size">{{ size }}</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <input type="text" v-model="filters.search" placeholder="Cari pemohon atau kode barang..." class="border border-gray-300 rounded-md px-3 py-2 w-64" />
+        </div>
     </div>
 
     <div v-if="loading" class="text-center py-16"><p class="text-gray-500">Memuat data permohonan...</p></div>
@@ -41,30 +47,30 @@
           <thead>
             <tr class="bg-gray-200 text-gray-700 text-left text-sm">
               <th class="border px-4 py-3">#</th>
-              <th class="border px-4 py-3">Unit/Jurusan</th>
-              <th class="border px-4 py-3">Pemohon</th>
+              <!-- <th class="border px-4 py-3">Unit/Jurusan</th> -->
+              <!-- <th class="border px-4 py-3">Pemohon</th> -->
               <th class="border px-4 py-3">Tipe Barang</th>
               <th class="border px-4 py-3">Keperluan</th>
               <th class="border px-4 py-3">Lokasi</th>
               <th class="border px-4 py-3">Jadwal Pinjam</th>
               <th class="border px-4 py-3">Jadwal Kembali</th>
-              <th class="border px-4 py-3">Entry User</th>
-              <!-- <th class="border px-4 py-3">Status</th> -->
+              <!-- <th class="border px-4 py-3">Entry User</th>
+              <th class="border px-4 py-3">Status</th> -->
               <th class="border px-4 py-3 text-center">Action</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(request, index) in requests" :key="request.id" class="hover:bg-gray-50 transition">
               <td class="border px-4 py-2">{{ pagination.from + index }}</td>
-              <td class="border px-4 py-3">{{ request.created_by.name }}</td>
-              <td class="border px-4 py-3">{{ request.requester.name }}</td>
+              <!-- <td class="border px-4 py-3">{{ request.created_by.name }}</td> -->
+              <!-- <td class="border px-4 py-3">{{ request.requester.name }}</td> -->
               <td class="border px-4 py-3 capitalize">{{ request.item_type }}</td>
               <td class="border px-4 py-3 text-sm text-gray-600">{{ request.purpose }}</td>
               <td class="border px-4 py-3 text-sm text-gray-600">{{ request.location }}</td>
               <td class="border px-4 py-3">{{ formatDate(request.start_at) }}</td>
               <td class="border px-4 py-3">{{ formatDate(request.end_at) }}</td>
-              <td class="border px-4 py-3">{{ formatDate(request.created_at) }}</td>
-              <!-- <td class="border px-4 py-2">
+              <!-- <td class="border px-4 py-3">{{ formatDate(request.created_at) }}</td>
+              <td class="border px-4 py-2">
                 <span class="px-2 py-1 rounded-full text-xs font-semibold" :class="getStatusClass(request.status)">
                   {{ request.status.replace('_', ' ') }}
                 </span>
@@ -106,6 +112,16 @@
       <p v-if="!loading && requests.length === 0" class="text-gray-500 text-center mt-4">
         Tidak ada permohonan yang sesuai dengan filter.
       </p>
+      <div v-if="!loading && pagination.total > 0" class="flex justify-between items-center mt-4 text-sm text-gray-600">
+      <div>
+        Menampilkan <span class="font-semibold">{{ pagination.from }}</span> sampai <span class="font-semibold">{{ pagination.to }}</span> dari <span class="font-semibold">{{ pagination.total }}</span> data
+      </div>
+      <div class="flex items-center gap-2">
+        <button :disabled="!pagination.prev_page_url" @click="changePage(pagination.current_page - 1)" class="px-3 py-1 border rounded disabled:opacity-50">Prev</button>
+        <span>Page {{ pagination.current_page }} dari {{ pagination.last_page }}</span>
+        <button :disabled="!pagination.next_page_url" @click="changePage(pagination.current_page + 1)" class="px-3 py-1 border rounded disabled:opacity-50">Next</button>
+      </div>
+    </div>
     </div>
   </div>
 
@@ -223,6 +239,7 @@ export default {
       requests: [],
       loading: true,
       filters: {
+        status: 'PENDING_UNIT',
         type: 'Semua',
         search: '',
         perPage: 10,
@@ -231,6 +248,12 @@ export default {
       pagination: {},
       currentUser: null,
       processingId: null,
+      tabs: [
+        { name: 'Menunggu Unit', status: 'PENDING_UNIT' },
+        { name: 'Menunggu Konfirmasi PTIK', status: 'PENDING_PTIK' },
+        { name: 'Ditolak', status: 'REJECTED' },
+        { name: 'Dibatalkan', status: 'CANCELLED' },
+      ],
       
       // State untuk Modal Tambah
       showAddModal: false,
@@ -257,19 +280,12 @@ export default {
       editingRequestId: null,
     };
   },
+  
   watch: {
-    'filters.search': _.debounce(function() {
-      this.filters.page = 1;
-      this.fetchRequests();
-    }, 500),
-    'filters.perPage': function() {
-      this.filters.page = 1;
-      this.fetchRequests();
-    },
-    'filters.type': function() {
-      this.filters.page = 1;
-      this.fetchRequests();
-    }
+    'filters.status'() { this.filters.page = 1; this.fetchRequests(); },
+    'filters.type'() { this.filters.page = 1; this.fetchRequests(); },
+    'filters.search': _.debounce(function() { this.filters.page = 1; this.fetchRequests(); }, 500),
+    'filters.perPage'() { this.filters.page = 1; this.fetchRequests(); },
   },
   methods: {
     async fetchRequests() {
@@ -283,7 +299,7 @@ export default {
         this.requests = response.data.data;
         this.pagination = response.data;
       } catch (error) {
-        this.$swal.fire('Gagal!', 'Tidak dapat mengambil data permohonan dari server.', 'error');
+        this.$swal.fire('Gagal!', 'Tidak dapat mengambil data permohonan.', 'error');
       } finally {
         this.loading = false;
       }
@@ -301,7 +317,7 @@ export default {
         const userRole = this.currentUser.role;
         const requestStatus = request.status;
         if (userRole === 'TU' && requestStatus === 'PENDING_UNIT') return true;
-        if (userRole === 'PTIK' && requestStatus === 'PENDING_PTIK') return true;
+        if (userRole === 'PTIK' && requestStatus === 'PENDINGPTIK') return true;
         // Fast-track untuk PTIK
         if (userRole === 'PTIK' && requestStatus === 'PENDING_UNIT' && request.created_by.role === 'PTIK') return true;
         return false;
@@ -309,7 +325,7 @@ export default {
     canBeCancelled(request) {
         if (!this.currentUser) return false;
         return this.currentUser.id === request.created_by.id && 
-                (request.status === 'PENDING_UNIT' || request.status === 'PENDING_PTIK');
+                (request.status === 'PENDING_UNIT' || request.status === 'PENDINGPTIK');
     },
 
     // =========================================================
@@ -477,6 +493,9 @@ export default {
     filterByType(type) {
       this.filters.type = type;
     },
+    filterByStatus(status) {
+      this.filters.status = status;
+    },
     openNewRequestModal() {
       this.validationErrors = {};
       this.addForm = { 
@@ -529,12 +548,9 @@ export default {
     getStatusClass(status) {
         const map = {
             PENDING_UNIT: 'bg-yellow-100 text-yellow-800',
-            PENDING_PTIK: 'bg-blue-100 text-blue-800',
-            APPROVED: 'bg-green-100 text-green-800',
+            PENDINGPTIK: 'bg-blue-100 text-blue-800',
             REJECTED: 'bg-red-100 text-red-800',
             CANCELLED: 'bg-gray-100 text-gray-800',
-            BORROWED: 'bg-purple-100 text-purple-800',
-            COMPLETED: 'bg-indigo-100 text-indigo-800',
         };
         return map[status] || 'bg-gray-200 text-gray-900';
     },
@@ -589,12 +605,18 @@ export default {
         this.isSubmitting = false;
       }
     },
+    changePage(page) {
+      if (page > 0 && page <= this.pagination.last_page) {
+        this.filters.page = page;
+        // this.fetchRequests(); // Tidak perlu, sudah ada di watcher
+      }
+    },
   },
   created() {
     this.fetchRequests();
     this.fetchCurrentUser();
-    this.fetchUserSelectionList();
     this.fetchItemTypeOptions();
+    this.fetchUserSelectionList();
   },
 };
 </script>

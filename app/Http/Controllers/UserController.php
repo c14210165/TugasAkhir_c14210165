@@ -149,7 +149,7 @@ class UserController extends Controller
      */
     public function demote(User $user)
     {
-        if (auth()->id() === $user->id) {
+        if (Auth::id() === $user->id) {
             return response()->json(['message' => 'Anda tidak bisa mencabut hak akses diri sendiri.'], 403);
         }
         

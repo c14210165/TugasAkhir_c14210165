@@ -12,10 +12,11 @@ use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\AdditionalTypeController;
+use App\Http\Controllers\EmailController;
 
 Route::post('/login', [AuthController::class, 'login']); 
 
-//Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -92,7 +93,9 @@ Route::post('/login', [AuthController::class, 'login']);
 
     Route::post('/types/add', [AdditionalTypeController::class, 'store']);
 
-//});
+    Route::post('/send-email', [EmailController::class, 'send']);
+
+});
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

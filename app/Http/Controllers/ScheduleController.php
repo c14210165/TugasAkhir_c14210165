@@ -10,45 +10,39 @@ class ScheduleController extends Controller
 {
     public function index(Request $request)
     {
-        // Memulai query dasar.
-        // Halaman ini menampilkan semua jadwal yang relevan, tidak peduli siapa yang login.
-        $query = Loan::query()->with(['requester:id,name', 'item:id,brand,code'])
+        // Memulai query dasar, termasuk relasi
+        $query = Loan::query()
+            ->with(['requester:id,name', 'item:id,brand,code', 'unitApprover:id,name'])
             ->whereIn('status', [LoanStatus::APPROVED, LoanStatus::ACTIVE])
-            ->whereNotNull('item_id'); // Pastikan hanya yang sudah ada barangnya
+            ->whereNotNull('item_id'); // Hanya peminjaman yang sudah punya barang
 
-        // Terapkan filter tipe barang dari frontend jika ada
+        // Filter tipe barang jika ada dari frontend
         if ($request->has('type') && $request->query('type') !== 'Semua') {
             $query->where('item_type', $request->query('type'));
         }
 
         $loans = $query->get();
 
-        // Proses mapping untuk diubah menjadi format event kalender
+        // Mapping menjadi format event untuk FullCalendar
         $events = $loans->map(function ($loan) {
-            
-            $color = '';
-            // Gunakan ->value untuk perbandingan yang aman
-            switch ($loan->status->value) {
-                case LoanStatus::APPROVED->value:
-                    $color = '#3b82f6'; // Biru
-                    break;
-                case LoanStatus::ACTIVE->value:
-                    $color = '#16a34a'; // Hijau
-                    break;
-                default:
-                    $color = '#6b7280'; // Abu-abu
-                    break;
-            }
-            
-            $itemTitle = $loan->item ? $loan->item->brand : '[No Item]';
-            $requesterName = $loan->requester ? $loan->requester->name : '[No Requester]';
+            $color = match ($loan->status->value) {
+                LoanStatus::APPROVED->value => '#3b82f6', // Biru
+                LoanStatus::ACTIVE->value => '#16a34a',   // Hijau
+                default => '#6b7280',                      // Abu-abu
+            };
 
             return [
-                'title' => "{$itemTitle} - {$requesterName}",
+                'title' => ($loan->item->brand ?? '[No Item]') . ' - ' . ($loan->requester->name ?? '[No Requester]'),
                 'start' => $loan->start_at,
                 'end' => $loan->end_at,
                 'color' => $color,
-                'extendedProps' => [ 'loan_id' => $loan->id ]
+                'extendedProps' => [
+                    'loan_id' => $loan->id,
+                    'item_code' => $loan->item?->code ?? '-',
+                    'requester_name' => $loan->unitApprover?->name ?? '-',
+                    'purpose' => $loan->purpose ?? '-',
+                    'returned_at' => $loan->returned_at,
+                ]
             ];
         });
 

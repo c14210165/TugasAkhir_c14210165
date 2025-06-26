@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\ItemType;     // <-- Import Enum
 use App\Enums\LoanStatus;   // <-- Import Enum
 use App\Enums\ReturnCondition;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -120,12 +119,22 @@ class Loan extends Model
         return $this->belongsTo(User::class, 'requester_id');
     }
 
+    public function originalRequester()
+    {
+        return $this->belongsTo(User::class, 'original_requester_id');
+    }
+
     /**
      * Relasi ke barang spesifik yang dipinjamkan.
      */
     public function item()
     {
         return $this->belongsTo(Item::class, 'item_id')->withTrashed();
+    }
+
+    public function itemType()
+    {
+        return $this->belongsTo(ItemType::class, 'item_type', 'name');
     }
 
     /**

@@ -28,7 +28,9 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'description'
+        'description',
+        'identity_number',
+        'unit_id'
     ];
 
     /**
@@ -63,5 +65,10 @@ class User extends Authenticatable
     public function createdLoans()
     {
         return $this->hasMany(Loan::class, 'created_by_id');
+    }
+
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
     }
 }

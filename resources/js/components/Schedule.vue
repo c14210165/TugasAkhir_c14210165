@@ -66,6 +66,41 @@
         </div>
       </div>
     </div>
+    
+    </div>
+    <div v-if="selectedDateLoans.length" class="mt-6 bg-white p-4 rounded-md shadow-md">
+      <h3 class="text-lg font-semibold mb-4">
+        Peminjaman pada {{ new Date(selectedDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) }}
+      </h3>
+      <table class="min-w-full text-sm text-left border border-gray-200">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="px-4 py-2 border-b">No</th>
+          <th class="px-4 py-2 border-b">Barang</th>
+          <th class="px-4 py-2 border-b">Pemohon</th>
+          <th class="px-4 py-2 border-b">Tujuan</th>
+          <th class="px-4 py-2 border-b">Tanggal Pinjam</th>
+          <th class="px-4 py-2 border-b">Tenggat Kembali</th>
+          <th class="px-4 py-2 border-b">Keterangan</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(item, index) in selectedDateLoans" :key="index">
+          <td class="px-4 py-2 border-b">{{ index + 1 }}</td>
+          <td class="px-4 py-2 border-b">{{ item.extendedProps.item_code || '-' }}</td>
+          <td class="px-4 py-2 border-b">{{ item.extendedProps.requester_name || '-' }}</td>
+          <td class="px-4 py-2 border-b whitespace-pre-wrap">{{ item.extendedProps.purpose || '-' }}</td>
+          <td class="px-4 py-2 border-b">{{ formatDate(item.start) }}</td>
+          <td class="px-4 py-2 border-b">{{ formatDate(item.end) }}</td>
+          <td class="px-4 py-2 border-b">
+            <span v-if="item.extendedProps.lateness?.is_late" class="text-red-600 font-semibold">
+                Terlambat {{ item.extendedProps.lateness.minutes_late }} menit
+            </span>
+            <span v-else class="text-green-600">Tepat waktu</span>
+        </td>
+        </tr>
+      </tbody>
+    </table>
     </div>
 </template>
 
@@ -91,7 +126,8 @@ export default {
           right: 'dayGridMonth,dayGridWeek' // Pilihan view bulan & minggu
         },
         events: [], // Data event akan diisi dari API
-        eventClick: this.handleEventClick, // Fungsi saat event diklik
+        eventClick: this.handleEventClick,
+        dateClick: this.handleDateClick, // Fungsi saat event diklik
         locale: 'id', // Bahasa Indonesia
         buttonText: {
             today: 'Hari Ini',
@@ -105,6 +141,8 @@ export default {
       // State untuk modal detail
       showDetailModal: false,
       selectedLoanForDetail: null,
+      selectedDate: null,
+      selectedDateLoans: [],
     };
   },
   watch: {
@@ -154,6 +192,19 @@ export default {
         this.$swal.fire('Gagal!', 'Tidak dapat memuat detail peminjaman.', 'error');
       }
     },
+    handleDateClick(info) {
+      const clickedDate = info.dateStr; // YYYY-MM-DD
+      this.selectedDate = clickedDate;
+
+      // Ambil semua event yang masuk dalam tanggal tersebut
+      const filteredEvents = this.calendarOptions.events.filter(event => {
+        const startDate = new Date(event.start).toISOString().slice(0, 10);
+        const endDate = new Date(event.end).toISOString().slice(0, 10);
+        return clickedDate >= startDate && clickedDate <= endDate;
+      });
+
+      this.selectedDateLoans = filteredEvents;
+    },
     // Fungsi untuk menutup modal
     closeDetailModal() {
         this.showDetailModal = false;
@@ -162,8 +213,8 @@ export default {
     // Fungsi format tanggal (bisa dicopy dari komponen lain)
     formatDate(dateString) {
       if (!dateString) return null;
-      const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-      return new Date(dateString).toLocaleDateString('id-ID', options);
+      const options = { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+      return new Date(dateString).toLocaleString('id-ID', options);
     },
     getStatusText(loan) {
         if (!loan || !loan.status) return '';

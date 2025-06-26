@@ -47,14 +47,19 @@
         <table class="w-full border border-gray-300 rounded-md text-sm">
           <thead>
             <tr class="bg-gray-200">
-              <th class="border p-2 text-left">Brand & Kode Barang</th>
+              <th class="border p-2 text-left">Informasi Barang</th>
               <th class="border p-2 text-center w-40">Jumlah Pemakaian</th>
               <th class="border p-2 text-center w-48">Total Jam Pemakaian</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="item in reportData.item_report" :key="item.id" class="hover:bg-gray-50">
-              <td class="border p-2 font-medium">{{ item.brand }} ({{ item.code }})</td>
+              <td class="border p-2">
+                <div class="font-medium">{{ item.brand }} ({{ item.code }})</div>
+                <div v-if="item.barcode" class="text-xs text-gray-500 mt-1">
+                  Barcode: {{ item.barcode }}
+                </div>
+              </td>
               <td class="border p-2 text-center">{{ item.loans_count }} kali</td>
               <td class="border p-2 text-center font-mono">{{ formatHours(item.total_usage_hours) }}</td>
             </tr>

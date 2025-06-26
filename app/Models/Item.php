@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\ItemType;   // <-- Import Enum
 use App\Enums\ItemStatus;
 use App\Enums\LoanStatus; // <-- Import Enum
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,7 +16,8 @@ class Item extends Model
         'barcode',
         'code',
         'brand',
-        'type',
+        'name',
+        'item_type_id',
         'accessories',
         'status',
     ];
@@ -67,5 +67,11 @@ class Item extends Model
             LoanStatus::APPROVED->value, // Disetujui (menunggu diambil)
             LoanStatus::ACTIVE->value,   // Aktif (sedang dipinjam)
         ]);
+    }
+
+    public function itemType()
+    {
+        // Pastikan ini mengarah ke App\Models\ItemType
+        return $this->belongsTo(ItemType::class);
     }
 }

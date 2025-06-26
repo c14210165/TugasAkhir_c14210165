@@ -5,13 +5,12 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Loan;
 use App\Models\Item;
-use App\Models\AdditionalItemType;
+use App\Models\ItemType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
-use App\Enums\ItemType;
 use App\Enums\ItemStatus;
 use App\Enums\LoanStatus;
 use App\Enums\UserRole;
@@ -102,24 +101,14 @@ class LoanController extends Controller
 
     public function store(Request $request)
     {
-        $enumTypes = array_column(ItemType::cases(), 'value');
-        // 2. Ambil dari Database
-        $dbTypes = AdditionalItemType::pluck('name')->toArray();
-        // 3. Gabungkan keduanya menjadi satu array
-        $allValidTypes = array_merge($enumTypes, $dbTypes);
-
         // 1. Validasi semua input yang dikirim dari form Vue
         $validatedData = $request->validate([
             // 'exists:users,id' memastikan user yang dipilih benar-benar ada di database
             'requester_id' => 'required|exists:users,id', 
+            'original_requester_id' => 'required|exists:users,id',
             
             // Validasi tipe barang harus salah satu dari yang ada di Enum
-            'item_type' => [
-                'required',
-                'string',
-                // Periksa apakah nilainya ada di kolom 'name' pada tabel 'additional_item_types'
-                Rule::in(AdditionalItemType::pluck('name')->toArray())
-            ],
+            'item_type'   => 'required',
 
             'location' => 'required|string|max:1000',
             'purpose' => 'required|string|max:2000',
@@ -136,7 +125,7 @@ class LoanController extends Controller
         // 3. Simpan data yang sudah tervalidasi dan lengkap ke database
         $loan = Loan::create($validatedData);
 
-        $loan->load(['requester:id,name', 'createdBy:id,name,role']);
+        $loan->load(['requester:id,name', 'createdBy:id,name,role', 'itemType']);
 
         // 4. Kirim kembali response sukses beserta data yang baru dibuat
         return response()->json([
@@ -168,7 +157,9 @@ class LoanController extends Controller
             $loan->item->update(['status' => ItemStatus::BORROWED]);
         });
 
-        return response()->json(['message' => 'Barang berhasil diserahkan. Status peminjaman kini AKTIF.']);
+        $loan->load(['requester', 'item', 'checkedOutBy', 'createdBy']);
+
+        return response()->json(['message' => 'Barang berhasil diserahkan. Status peminjaman kini AKTIF.', 'loan' => $loan]);
     }
 
     /**

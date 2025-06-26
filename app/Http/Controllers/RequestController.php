@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Loan;
 use App\Models\Item;
-use App\Models\AdditionalItemType;
+use App\Models\ItemType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +14,8 @@ use Illuminate\Validation\ValidationException;
 use App\Enums\LoanStatus;
 use App\Enums\UserRole;
 use App\Enums\ItemStatus;
-use App\Enums\ItemType;
+use App\Events\LoanRequested;
+use App\Events\LoanUpdated;
 
 class RequestController extends Controller
 {
@@ -25,7 +26,7 @@ class RequestController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $query = Loan::query()->with(['requester:id,name', 'createdBy:id,name,role']);
+        $query = Loan::query()->with(['requester:id,name', 'createdBy:id,name,role', 'originalRequester.unit']);
 
         // --- LOGIKA BARU BERDASARKAN PERAN ---
 
@@ -44,21 +45,22 @@ class RequestController extends Controller
             });
 
         } elseif ($user->role === UserRole::TU) {
-            // TU logic (revisi)
-            $status = $request->query('status', LoanStatus::PENDING_UNIT->value);
+            $status = $request->query('status'); // status bisa null
 
-            if ($status === LoanStatus::PENDING_UNIT->value) {
-                $query->where('status', LoanStatus::PENDING_UNIT->value)
-                    ->whereHas('createdBy', function ($q) {
-                        $q->whereIn('role', [UserRole::TU->value, UserRole::USER->value]);
-                    });
-            } else {
-                $query->where('created_by_id', $user->id)
-                    ->where('status', $status);
+            $query->where(function ($q) use ($user) {
+                $q->whereHas('requester', function ($rq) use ($user) {
+                    $rq->where('unit_id', $user->unit_id); // user dari unit yang sama
+                })
+                ->orWhere('created_by_id', $user->id); // atau yang dibuat sendiri
+            });
+
+            // Tambah filter status jika ada
+            if ($status) {
+                $query->where('status', $status);
             }
         } else {
             // Pengguna biasa hanya melihat permohonannya sendiri
-            $query->where('requester_id', $user->id);
+            $query->where('original_requester_id', $user->id);
             
             if ($request->has('status')) {
                 $query->where('status', $request->query('status'));
@@ -80,19 +82,21 @@ class RequestController extends Controller
         $query->orderBy('created_at', 'desc');
         $loans = $query->paginate($request->query('perPage', 10));
 
+        event(new LoanRequested($loans));
+
         return response()->json($loans);
     }
 
     public function update(Request $request, Loan $loan)
     {
+        $validItemTypes = ItemType::pluck('name')->toArray();
         // Validasi data yang masuk dari form edit
         $validatedData = $request->validate([
             'requester_id' => 'required|exists:users,id',
             'item_type' => [
                 'required',
                 'string',
-                // Periksa apakah nilainya ada di kolom 'name' pada tabel 'additional_item_types'
-                Rule::in(AdditionalItemType::pluck('name')->toArray())
+                Rule::in($validItemTypes), // Validasi terhadap daftar nama tipe
             ],
             'location'     => 'required|string|max:1000',
             'purpose'      => 'required|string|max:2000',
@@ -102,6 +106,8 @@ class RequestController extends Controller
 
         // Lakukan update pada data loan yang ditemukan
         $loan->update($validatedData);
+
+        event(new LoanUpdated($loan));
 
         // Kirim kembali response sukses beserta data yang sudah terupdate
         return response()->json([
@@ -144,7 +150,11 @@ class RequestController extends Controller
         elseif ($loan->status === LoanStatus::PENDING_UNIT && $user->role === UserRole::TU) {
             $nextStatus = LoanStatus::PENDING_PTIK;
             $approverField = 'unit_approver_id';
-        } 
+
+            if ($loan->requester->role === UserRole::USER) {
+                $updateData['requester_id'] = $user->id; // ← inilah yang perlu ditambahkan
+            }
+        }
         // Kondisi 3: Alur normal, PTIK menyetujui PENDING_PTIK
         elseif ($loan->status === LoanStatus::PENDING_PTIK && $user->role === UserRole::PTIK) {
             $request->validate(['item_id' => 'required|exists:items,id']);
@@ -169,6 +179,8 @@ class RequestController extends Controller
         if ($nextStatus === LoanStatus::APPROVED) {
             Item::find($request->input('item_id'))->update(['status' => ItemStatus::BORROWED->value]);
         }
+
+        event(new LoanUpdated($loan));
         
         return response()->json(['message' => 'Permohonan berhasil diproses.']);
     }
@@ -191,6 +203,8 @@ class RequestController extends Controller
             $user->role === UserRole::PTIK ? 'ptik_approver_id' : 'unit_approver_id' => $user->id
         ]);
 
+        event(new LoanUpdated($loan));
+
         return response()->json(['message' => 'Permohonan telah ditolak.']);
     }
 
@@ -208,6 +222,8 @@ class RequestController extends Controller
         }
 
         $loan->update(['status' => LoanStatus::CANCELLED]);
+
+        event(new LoanUpdated($loan));
         
         return response()->json(['message' => 'Permohonan berhasil dibatalkan.']);
     }

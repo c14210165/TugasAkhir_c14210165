@@ -3,8 +3,9 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use App\Enums\ItemType;
 use App\Enums\LoanStatus;
+use App\Models\User;
+use App\Models\ItemType;
 use Carbon\Carbon;
 
 /**
@@ -19,37 +20,33 @@ class LoanFactory extends Factory
      */
     public function definition(): array
     {
-        // Rencanakan peminjaman untuk beberapa hari ke depan
+        $itemTypes = ItemType::pluck('name');
         $startDate = fake()->dateTimeBetween('+2 days', '+10 days');
         $endDate = (clone $startDate)->modify('+'.rand(1, 5).' days');
 
         return [
-            // Kolom-kolom ini akan diisi secara spesifik di Seeder
-            'requester_id' => null, 
-            'created_by_id' => null,
-            'item_id' => null,
+            // Kita set ke user acak sebagai default, tapi ini akan ditimpa di seeder.
+            'requester_id' => User::factory(),
+            'created_by_id' => User::factory(),
+            
+            // --- LOGIKA BARU UNTUK ORIGINAL REQUESTER ---
+            // Secara default, pemohon asli adalah sama dengan pemohon awal.
+            // Kita gunakan closure agar nilainya dinamis berdasarkan requester_id.
+            'original_requester_id' => function (array $attributes) {
+                return $attributes['requester_id'];
+            },
 
-            // Data permohonan awal
-            'item_type' => fake()->randomElement(array_column(ItemType::cases(), 'value')),
+            'item_type' => fake()->randomElement($itemTypes),
+
             'location' => fake()->address(),
             'purpose' => fake()->sentence(8),
-            'start_at' => $startDate, // Menggunakan nama kolom baru
-            'end_at' => $endDate,     // Menggunakan nama kolom baru
+            'start_at' => $startDate,
+            'end_at' => $endDate,
 
-            // Semua kolom lain defaultnya adalah null atau nilai awal
-            'unit_approver_id' => null,
-            'ptik_approver_id' => null,
-            'rejection_reason' => null,
-            'checked_out_by_id' => null,
-            'checked_in_by_id' => null,
-            'return_condition' => null,
-            'return_notes' => null,
-            'is_late' => false, // Default tidak terlambat
-            'fine' => 0.00,
+            // Kolom lainnya biarkan null/default
             'status' => LoanStatus::PENDING_UNIT->value,
-            'responded_at' => null,
-            'borrowed_at' => null,
-            'returned_at' => null,
+            'is_late' => false,
+            // ...
         ];
     }
 
@@ -57,12 +54,8 @@ class LoanFactory extends Factory
     {
         return $this->state(function (array $attributes) {
             
-            // [DIUBAH] Bungkus hasil Faker dengan Carbon::instance()
-            // agar menjadi objek Carbon, bukan DateTime biasa.
             $createdAt = Carbon::instance(fake()->dateTimeBetween('-1 year', '-1 month'));
 
-            // Sekarang semua variabel tanggal adalah objek Carbon,
-            // dan method ->addDays() akan berjalan lancar.
             $approvedAt = (clone $createdAt)->addDays(rand(1, 2));
             $borrowedAt = (clone $approvedAt)->addDays(rand(1, 2));
             $endDate = (clone $borrowedAt)->addDays(rand(3, 7)); // Durasi pinjam

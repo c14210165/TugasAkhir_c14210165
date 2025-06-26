@@ -16,6 +16,8 @@ class DatabaseSeeder extends Seeder
         Schema::disableForeignKeyConstraints();
         // Panggil seeder yang sudah kita buat
         $this->call([
+            UnitSeeder::class,
+            ItemTypeSeeder::class,
             UserSeeder::class,
             ItemSeeder::class,
             LoanSeeder::class,

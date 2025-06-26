@@ -139,18 +139,13 @@
           <label class="block font-medium">Barang yang Ditugaskan</label>
           <select 
               v-model="editForm.item_id" 
-              class="w-full border rounded px-3 py-2 bg-white disabled:bg-gray-200 disabled:cursor-not-allowed" 
-              :disabled="editForm.status === 'ACTIVE'"
+              class="w-full border rounded px-3 py-2 bg-white" 
               required>
               <option v-if="availableItemsForEdit.length === 0" disabled value="">Memuat barang...</option>
               <option v-for="item in availableItemsForEdit" :key="item.id" :value="item.id">
                   {{ item.brand }} - (Kode: {{ item.code }}) {{ item.id === originalItemId ? '(Barang saat ini)' : '' }}
               </option>
           </select>
-          
-          <p v-if="editForm.status === 'ACTIVE'" class="text-xs text-yellow-700 mt-1">
-              Barang tidak dapat diganti karena peminjaman sedang aktif (sudah diserahkan).
-          </p>
 
           <p v-if="validationErrors.item_id" class="text-red-500 text-sm mt-1">{{ validationErrors.item_id[0] }}</p>
         </div>
@@ -333,18 +328,30 @@ export default {
     async checkOut(loan) {
         const result = await this.$swal.fire({
             title: 'Serahkan Barang?',
-            text: `Anda akan mencatat bahwa barang telah diserahkan kepada ${loan.requester.name}.`,
+            text: `Anda akan menyerahkan "${loan.item.brand}" kepada ${loan.requester.name}.`,
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Ya, Serahkan!',
+            confirmButtonText: 'Ya, Serahkan & Cetak Bukti!',
             cancelButtonText: 'Batal'
         });
+
         if (result.isConfirmed) {
             this.processingId = loan.id;
             try {
-                await this.$axios.post(`/api/loans/${loan.id}/checkout`);
-                this.$swal.fire('Berhasil!', 'Barang telah diserahkan dan status peminjaman menjadi AKTIF.', 'success');
+                // Panggil API untuk checkout
+                const response = await this.$axios.post(`/api/loans/${loan.id}/checkout`);
+                
+                // Ambil data loan yang sudah terupdate dari response
+                const updatedLoan = response.data.loan;
+
+                this.$swal.fire('Berhasil!', response.data.message, 'success');
+                
+                // Panggil helper untuk mencetak form dengan data yang sudah diupdate
+                this.printHandoverForm(updatedLoan);
+
+                // Refresh daftar di tabel
                 this.fetchLoans();
+
             } catch (error) {
                 const message = error.response?.data?.message || 'Terjadi kesalahan.';
                 this.$swal.fire('Gagal!', message, 'error');
@@ -353,6 +360,178 @@ export default {
             }
         }
     },
+
+    // TAMBAHKAN METHOD HELPER BARU INI
+    printHandoverForm(loan) {
+    /**
+     * Fungsi untuk mencetak form serah terima barang.
+     * Membuka window baru, menulis konten HTML, dan memanggil dialog print.
+     * @param {object} loan - Objek yang berisi semua detail peminjaman.
+     */
+    const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Form Barang Keluar - ${loan.item.code}</title>
+            <script src="https://cdn.tailwindcss.com"><\/script>
+            <style>
+                body { 
+                    font-family: sans-serif; 
+                }
+                /* Wrapper untuk setiap form agar tidak terpotong saat print */
+                .form-container {
+                    page-break-inside: avoid;
+                    margin-bottom: 2rem; /* Jarak antara dua form */
+                }
+                @media print {
+                    body { 
+                        -webkit-print-color-adjust: exact; 
+                    }
+                    @page { 
+                        margin: 0.5in; /* Margin halaman saat di-print */
+                    }
+                    .form-container {
+                        margin-bottom: 4rem; /* Jarak lebih besar saat print */
+                    }
+                }
+            </style>
+        </head>
+        <body class="text-xs bg-white">
+
+            <!-- FORMULIR PERTAMA -->
+            <div class="form-container">
+                <!-- Header: Logo dan Judul -->
+                <div class="flex items-center pb-2 mb-2">
+                    <!-- Ganti div placeholder ini dengan tag <img> untuk logo Anda -->
+                    <div class="w-20 h-20 flex-shrink-0 flex items-center justify-center mr-4">
+                        <img src="https://www.pcu.ac.id/wp-content/uploads/2023/08/logo-pcu-new.png" alt="Logo Universitas" class="object-contain h-full w-full" onerror="this.style.display='none'; this.parentElement.innerHTML='<p class=\\'text-gray-400 text-xs text-center\\'>Logo</p>';">
+                    </div>
+                    <div class="w-full text-center border-b-4 border-black">
+                        <h1 class="text-lg font-bold">FORM BARANG KELUAR/PEMINJAMAN</h1>
+                        <h2 class="text-md font-semibold">PUSAT TEKNOLOGI INFORMASI DAN KOMUNIKASI</h2>
+                    </div>
+                </div>
+
+                <!-- Tabel Metadata Dokumen -->
+                <table class="w-full border-collapse border border-black text-xs mb-4">
+                    <thead>
+                        <tr class="bg-gray-200 text-center font-bold">
+                            <th class="border border-black px-2 py-1">No. Dokumen</th>
+                            <th class="border border-black px-2 py-1">No. Revisi</th>
+                            <th class="border border-black px-2 py-1">Tanggal Berlaku</th>
+                            <th class="border border-black px-2 py-1">Halaman</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="text-center">
+                            <td class="border border-black px-2 py-1">F02-PM.01-PTIK-UKP</td>
+                            <td class="border border-black px-2 py-1">00</td>
+                            <td class="border border-black px-2 py-1">15-05-2020</td>
+                            <td class="border border-black px-2 py-1">1 dari 1</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Detail Peminjaman -->
+                <table class="w-full text-xs mb-4">
+                    <tr>
+                        <td class="w-1/2 py-1 align-top"><strong>Tgl. Ambil:</strong> ${this.formatDate(loan.borrowed_at)}</td>
+                        <td class="w-1/2 py-1 align-top"><strong>Peminjam:</strong> ${loan.requester.name}</td>
+                    </tr>
+                    <tr>
+                        <td class="w-1/2 py-1 align-top"><strong>Jadwal Pinjam:</strong> ${this.formatDate(loan.start_at)} s/d ${this.formatDate(loan.end_at)}</td>
+                        <td class="w-1/2 py-1 align-top"><strong>Keperluan:</strong> ${loan.purpose}</td>
+                    </tr>
+                </table>
+
+                <!-- Tabel Item yang Dipinjam -->
+                <table class="w-full border-collapse border border-black text-xs">
+                    <thead>
+                        <tr class="bg-gray-200 font-bold text-center">
+                            <th class="border border-black px-2 py-1">No Order</th>
+                            <th class="border border-black px-2 py-1">Kode Barang</th>
+                            <!-- Kolom "No Laptop" ditambahkan di sini -->
+                            <th class="border border-black px-2 py-1">No Laptop</th> 
+                            <th class="border border-black px-2 py-1">Merk Barang</th>
+                            <th class="border border-black px-2 py-1 w-2/5">Kelengkapan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="border border-black px-2 py-1 text-center">${loan.id}</td>
+                            <td class="border border-black px-2 py-1 text-center">${loan.item.barcode}</td>
+                            <!-- Pastikan objek 'loan.item' memiliki properti untuk "No Laptop", contohnya 'asset_tag' -->
+                            <td class="border border-black px-2 py-1 text-center">${loan.item.code}</td>
+                            <td class="border border-black px-2 py-1">${loan.item.brand}</td>
+                            <td class="border border-black px-2 py-1">${loan.item.accessories || '-'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Area Tanda Tangan -->
+                <div class="mt-8 flex justify-between text-xs text-center">
+                    <div>
+                        <p>Mengetahui,</p>
+                        <div class="mt-16">
+                            <p>(${loan.checked_out_by.name || '.....................'})</p>
+                        </div>
+                    </div>
+                    <div>
+                        <p>Peminjam,</p>
+                        <div class="mt-16">
+                            <p>(${loan.requester.name || '.....................'})</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FORMULIR KEDUA (DUPLIKAT) -->
+            <div class="form-container">
+                <!-- Kontennya sama persis dengan form pertama -->
+                <div class="flex items-center pb-2 mb-2">
+                    <div class="w-20 h-20 flex-shrink-0 flex items-center justify-center mr-4">
+                         <img src="https://upload.wikimedia.org/wikipedia/id/thumb/9/90/Logo_UPH.png/1200px-Logo_UPH.png" alt="Logo Universitas" class="object-contain h-full w-full" onerror="this.style.display='none'; this.parentElement.innerHTML='<p class=\\'text-gray-400 text-xs text-center\\'>Logo</p>';">
+                    </div>
+                    <div class="w-full text-center border-b-4 border-black">
+                        <h1 class="text-lg font-bold">FORM BARANG KELUAR/PEMINJAMAN</h1>
+                        <h2 class="text-md font-semibold">PUSAT TEKNOLOGI INFORMASI DAN KOMUNIKASI</h2>
+                    </div>
+                </div>
+                <table class="w-full border-collapse border border-black text-xs mb-4">
+                    <thead><tr class="bg-gray-200 text-center font-bold"><th class="border border-black px-2 py-1">No. Dokumen</th><th class="border border-black px-2 py-1">No. Revisi</th><th class="border border-black px-2 py-1">Tanggal Berlaku</th><th class="border border-black px-2 py-1">Halaman</th></tr></thead>
+                    <tbody><tr class="text-center"><td class="border border-black px-2 py-1">F02-PM.01-PTIK-UKP</td><td class="border border-black px-2 py-1">00</td><td class="border border-black px-2 py-1">15-05-2020</td><td class="border border-black px-2 py-1">1 dari 1</td></tr></tbody>
+                </table>
+                <table class="w-full text-xs mb-4">
+                    <tr><td class="w-1/2 py-1 align-top"><strong>Tgl. Ambil:</strong> ${this.formatDate(loan.borrowed_at)}</td><td class="w-1/2 py-1 align-top"><strong>Peminjam:</strong> ${loan.requester.name}</td></tr>
+                    <tr><td class="w-1/2 py-1 align-top"><strong>Jadwal Pinjam:</strong> ${this.formatDate(loan.start_at)} s/d ${this.formatDate(loan.end_at)}</td><td class="w-1/2 py-1 align-top"><strong>Keperluan:</strong> ${loan.purpose}</td></tr>
+                </table>
+                <table class="w-full border-collapse border border-black text-xs">
+                    <thead><tr class="bg-gray-200 font-bold text-center"><th class="border border-black px-2 py-1">No Order</th><th class="border border-black px-2 py-1">Kode Barang</th><th class="border border-black px-2 py-1">No Laptop</th><th class="border border-black px-2 py-1">Merk Barang</th><th class="border border-black px-2 py-1 w-2/5">Kelengkapan</th></tr></thead>
+                    <tbody><tr><td class="border border-black px-2 py-1 text-center">${loan.id}</td><td class="border border-black px-2 py-1 text-center">${loan.item.code}</td><td class="border border-black px-2 py-1 text-center">${loan.item.asset_tag || 'N/A'}</td><td class="border border-black px-2 py-1">${loan.item.brand}</td><td class="border border-black px-2 py-1">${loan.item.accessories || '-'}</td></tr></tbody>
+                </table>
+                <div class="mt-8 flex justify-between text-xs text-center">
+                    <div><p>Mengetahui,</p><div class="mt-16"><p>(${loan.checked_out_by.name || '.....................'})</p></div></div>
+                    <div><p>Peminjam,</p><div class="mt-16"><p>(${loan.requester.name || '.....................'})</p></div></div>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        // Beri jeda agar Tailwind CSS dan gambar dari CDN sempat di-load sebelum dialog print muncul
+        setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+        }, 500);
+    } else {
+        alert('Browser memblokir pop-up, mohon izinkan untuk melanjutkan pencetakan.');
+    }
+},
     async cancelLoan(loan) {
       const result = await this.$swal.fire({
           title: 'Batalkan Peminjaman?',

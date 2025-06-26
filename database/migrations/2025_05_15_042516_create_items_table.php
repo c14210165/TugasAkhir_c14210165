@@ -16,7 +16,8 @@ return new class extends Migration
             $table->string('barcode')->unique();
             $table->string('code')->unique();
             $table->string('brand');
-            $table->string('type');
+            $table->string('name');
+            $table->foreignId('item_type_id')->nullable()->constrained('item_types');
             $table->text('accessories')->nullable();
             $table->string('status')->default('AVAILABLE');
             $table->softDeletes();

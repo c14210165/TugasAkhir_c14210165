@@ -11,9 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('additional_item_types', function (Blueprint $table) {
+        Schema::create('item_types', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
+            $table->softDeletes();
             $table->timestamps();
         });
     }
@@ -23,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('additional_item_types');
+        Schema::dropIfExists('item_types');
     }
 };

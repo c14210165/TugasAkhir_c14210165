@@ -134,11 +134,11 @@
           <p v-if="validationErrors.requester_id" class="text-red-500 text-sm mt-1">{{ validationErrors.requester_id[0] }}</p>
         </div>
         <div>
-          <label class="block font-medium">Tipe Barang</label>
-          <select v-model="addForm.item_type" class="w-full border rounded px-3 py-2 bg-white" required>
-              <option disabled value="">Pilih Tipe Barang...</option>
-              <option v-for="type in itemTypeOptions" :key="type.value" :value="type.value">{{ type.label }}</option>
-          </select>
+            <label class="block font-medium">Tipe Barang</label>
+            <select v-model="addForm.item_type" class="w-full border rounded px-3 py-2 bg-white" required>
+                <option disabled value="">Pilih Tipe Barang...</option>
+                <option v-for="type in itemTypeOptions" :key="type.value" :value="type.label">{{ type.label }}</option>
+            </select>
             <p v-if="validationErrors.item_type" class="text-red-500 text-sm mt-1">{{ validationErrors.item_type[0] }}</p>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -171,7 +171,7 @@
       <form @submit.prevent="submitUpdateRequest" class="space-y-4">
         
         <div><label class="block font-medium">Pemohon (Atas Nama)</label><select v-model="editForm.requester_id" class="w-full border rounded px-3 py-2 bg-white" required><option disabled value="">Pilih User Pemohon...</option><option v-for="user in userSelectionList" :key="user.id" :value="user.id">{{ user.name }}</option></select><p v-if="validationErrors.requester_id" class="text-red-500 text-sm mt-1">{{ validationErrors.requester_id[0] }}</p></div>
-        <div><label class="block font-medium">Tipe Barang</label><select v-model="editForm.item_type" class="w-full border rounded px-3 py-2 bg-white" required><option disabled value="">Pilih Tipe Barang...</option><option v-for="type in itemTypeOptions" :key="type.value" :value="type.value">{{ type.label }}</option></select><p v-if="validationErrors.item_type" class="text-red-500 text-sm mt-1">{{ validationErrors.item_type[0] }}</p></div>
+        <div><label class="block font-medium">Tipe Barang</label><select v-model="editForm.item_type" class="w-full border rounded px-3 py-2 bg-white" required><option disabled value="">Pilih Tipe Barang...</option><option v-for="type in itemTypeOptions" :key="type.id" :value="type.label">{{ type.label }}</option></select><p v-if="validationErrors.item_type" class="text-red-500 text-sm mt-1">{{ validationErrors.item_type[0] }}</p></div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><label class="block font-medium">Tgl & Jam Mulai Pinjam</label><input v-model="editForm.start_at" type="datetime-local" class="w-full border rounded px-3 py-2" required /><p v-if="validationErrors.start_at" class="text-red-500 text-sm mt-1">{{ validationErrors.start_at[0] }}</p></div>
           <div><label class="block font-medium">Tgl & Jam Selesai Pinjam</label><input v-model="editForm.end_at" type="datetime-local" class="w-full border rounded px-3 py-2" required /><p v-if="validationErrors.end_at" class="text-red-500 text-sm mt-1">{{ validationErrors.end_at[0] }}</p></div>
@@ -185,6 +185,7 @@
         </div>
       </form>
     </div>
+    
     <div v-if="showDetailModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
     <div class="bg-white w-full max-w-3xl p-6 rounded-lg shadow-lg overflow-y-auto max-h-[90vh]">
         <div class="flex justify-between items-center mb-4 border-b pb-3">
@@ -541,7 +542,9 @@ export default {
       this.isSubmitting = true;
       this.validationErrors = {};
       try {
-        await this.$axios.post('/api/loans', this.addForm);
+        let formData = { ...this.addForm };
+        formData.original_requester_id = formData.requester_id;
+        await this.$axios.post('/api/loans', formData);
         this.closeAddModal();
         await this.fetchRequests();
         this.$swal.fire('Berhasil', 'Permohonan baru telah berhasil diajukan.', 'success');

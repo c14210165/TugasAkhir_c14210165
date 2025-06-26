@@ -4,11 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
-use App\Models\AdditionalItemType;
+use App\Models\ItemType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
-use App\Enums\ItemType; // <-- Import Enum Tipe Barang
 use App\Enums\ItemStatus;
 use App\Enums\LoanStatus; // <-- Import Enum Status Barang
 
@@ -19,14 +18,16 @@ class ItemController extends Controller
     {
         // Memulai query builder agar kita bisa menambahkan kondisi secara dinamis
         $query = Item::query()->with([
-            'currentLoan.requester:id,name', // Ambil nama dari peminjam (requester)
-            'currentLoan.unitApprover:id,name' // Ambil nama dari penyetuju unit
+            'itemType', // Memuat relasi ke tabel item_types
+            'currentLoan.requester:id,name',
+            'currentLoan.unitApprover:id,name'
         ]);
 
         // --- FILTERING ---
         // Cek jika ada parameter 'type' di URL (cth: /api/items?type=Laptop)
-        if ($request->has('type')) {
-            $query->where('type', $request->query('type'));
+        if ($request->has('type') && $request->query('type') !== 'Semua') {
+            // Filter sekarang dilakukan pada kolom 'item_type_id'
+            $query->where('item_type_id', $request->query('type'));
         }
 
         // Cek jika ada parameter 'status' di URL (cth: /api/items?status=AVAILABLE)
@@ -65,18 +66,19 @@ class ItemController extends Controller
 
     public function getTypes()
     {
-        // Sekarang HANYA mengambil dari database
-        $db_types = AdditionalItemType::query()
+        $types = ItemType::query() // Menggunakan model baru Anda
             ->orderBy('name', 'asc')
-            ->get()
-            ->map(function ($type) {
-                return [
-                    'value' => $type->name,
-                    'label' => $type->name // Dibuat sama agar konsisten
-                ];
-            });
+            ->get();
 
-        return response()->json($db_types);
+        // Ubah format agar cocok dengan frontend (value berisi ID, label berisi Nama)
+        $formattedTypes = $types->map(function ($type) {
+            return [
+                'value' => $type->id,   // Kirim ID sebagai value
+                'label' => $type->name, // Kirim nama sebagai label
+            ];
+        });
+
+        return response()->json($formattedTypes);
     }
 
     public function getAvailable(Request $request)
@@ -85,12 +87,21 @@ class ItemController extends Controller
             'type' => 'required|string',
         ]);
 
-        $items = Item::query()
-            ->where('type', $request->query('type'))
-            ->where('status', 'AVAILABLE') // Hanya yang statusnya AVAILABLE
-            ->select('id', 'brand', 'code') // Ambil data yang perlu saja
+        // Cari item_type berdasarkan nama tipe yang dikirim
+        $itemType = ItemType::where('name', $request->input('type'))->first();
+
+        if (!$itemType) {
+            return response()->json([
+                'message' => 'Tipe barang tidak ditemukan.'
+            ], 404);
+        }
+
+        // Ambil items dengan item_type_id dan status AVAILABLE
+        $items = Item::where('item_type_id', $itemType->id)
+            ->where('status', 'AVAILABLE')
+            ->select('id', 'brand', 'code')
             ->get();
-        
+
         return response()->json($items);
     }
 
@@ -100,9 +111,10 @@ class ItemController extends Controller
         // Langkah 1: Validasi semua input dari form
         $validatedData = $request->validate([
             'brand'       => 'required|string|max:255',
+            'name'        => 'required|string|max:255',
             'code'        => 'required|string|max:255|unique:items,code', // Pastikan kode unik
             'barcode'     => 'required|string|max:255|unique:items,barcode', // Pastikan barcode unik
-            'type'        => ['required', 'string', 'exists:additional_item_types,name'], // Validasi berdasarkan Enum
+            'item_type_id' => 'required|integer|exists:item_types,id',
             'accessories' => 'nullable|string',
             'status'      => ['required', Rule::in(array_column(ItemStatus::cases(), 'value'))], // Validasi berdasarkan Enum
         ]);
@@ -126,10 +138,11 @@ class ItemController extends Controller
         // Validasi input untuk proses update
         $validatedData = $request->validate([
             'brand'       => 'required|string|max:255',
+            'name'        => 'required|string|max:255',
             // Pastikan kode unik, TAPI abaikan untuk item ID saat ini
             'code'        => ['required', 'string', 'max:255', Rule::unique('items')->ignore($item->id)],
             'barcode'     => ['required', 'string', 'max:255', Rule::unique('items')->ignore($item->id)],
-            'type'        => ['required', 'string', 'exists:additional_item_types,name'],
+            'item_type_id' => 'required|integer|exists:item_types,id',
             'accessories' => 'nullable|string',
             'status'      => ['required', Rule::in(array_column(ItemStatus::cases(), 'value'))],
         ]);

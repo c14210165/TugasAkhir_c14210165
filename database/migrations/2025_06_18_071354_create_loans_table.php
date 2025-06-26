@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('created_by_id')->constrained('users');
             $table->foreignId('requester_id')->constrained('users'); // User yang mengajukan
+            $table->foreignId('original_requester_id')->constrained('users');
             $table->string('item_type'); // Tipe barang yang diminta
             $table->text('location'); // Lokasi penggunaan
             $table->text('purpose'); // Keperluan peminjaman
@@ -37,16 +38,6 @@ return new class extends Migration
             $table->text('return_notes')->nullable();
             $table->decimal('fine', 12, 2)->default(0.00); // Denda
 
-            // === KOLOM STATUS & TIMESTAMP (Menggabungkan semua alur) ===
-            /**
-             * Status yang mencakup seluruh alur:
-             * - PENDING_UNIT: Menunggu persetujuan Kepala Unit.
-             * - PENDING_PTIK: Menunggu persetujuan PTIK.
-             * - APPROVED: Permintaan disetujui, siap diambil.
-             * - REJECTED: Permintaan ditolak.
-             * - ACTIVE: Barang sedang dipinjam (sudah diambil).
-             * - COMPLETED: Peminjaman selesai (barang sudah kembali).
-             */
             $table->string('status')->default('PENDING_UNIT');
             
             $table->dateTime('responded_at')->nullable(); // Kapan final approval diberikan

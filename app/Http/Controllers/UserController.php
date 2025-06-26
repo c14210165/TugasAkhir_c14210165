@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Unit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -20,20 +21,27 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
-        // Memulai query dan langsung memfilter HANYA untuk user dengan role PTIK
-        $query = User::query()->where('role', UserRole::PTIK->value);
+        // Cari unit dengan nama "PTIK"
+        $ptikUnit = Unit::where('name', 'PTIK')->first();
 
-        // Menambahkan fungsionalitas pencarian di dalam daftar admin
+        if (!$ptikUnit) {
+            return response()->json(['message' => 'Unit PTIK tidak ditemukan'], 404);
+        }
+
+        // Ambil user yang unit-nya PTIK
+        $query = User::query()->where('unit_id', $ptikUnit->id);
+
+        // Tambahkan fitur pencarian
         if ($request->has('search')) {
             $searchTerm = $request->query('search');
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'like', "%{$searchTerm}%")
-                  ->orWhere('username', 'like', "%{$searchTerm}%")
-                  ->orWhere('email', 'like', "%{$searchTerm}%");
+                ->orWhere('username', 'like', "%{$searchTerm}%")
+                ->orWhere('email', 'like', "%{$searchTerm}%");
             });
         }
 
-        // Mengambil hasil dengan paginasi
+        // Ambil data dengan paginasi
         $admins = $query->paginate($request->query('perPage', 10));
 
         return response()->json($admins);

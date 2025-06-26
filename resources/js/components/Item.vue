@@ -43,6 +43,7 @@
                 <th class="border px-4 py-3">Barcode</th>
                 <th class="border px-4 py-3">Brand</th>
                 <th class="border px-4 py-3">Tipe</th>
+                <th class="border px-4 py-3">Jenis</th>
                 <th class="border px-4 py-3">Kelengkapan</th>
                 <th class="border px-4 py-3">Status</th>
                 <th class="border px-4 py-3">Status Pinjam</th>
@@ -55,7 +56,8 @@
                 <td class="border px-4 py-2 font-mono">{{ item.code }}</td>
                 <td class="border px-4 py-2 font-mono">{{ item.barcode }}</td>
                 <td class="border px-4 py-2">{{ item.brand }}</td>
-                <td class="border px-4 py-2 capitalize">{{ item.type }}</td>
+                <td class="border px-4 py-2 capitalize">{{ item.name }}</td>
+                <td class="border px-4 py-2 capitalize">{{ item.item_type.name }}</td>
                 <td class="border px-4 py-2 text-sm text-gray-600">{{ item.accessories || '-' }}</td>
                 <td class="border px-4 py-2">
                     <span :class="getStatusClass(item.status)" 
@@ -104,17 +106,19 @@
         <h2 class="text-xl font-bold mb-4">Tambah Barang Baru</h2>
         <form @submit.prevent="submitNewItem" class="space-y-4">
           <div><label class="block font-medium">Brand</label><input v-model="addForm.brand" type="text" class="w-full border rounded px-3 py-2" required /><p v-if="validationErrors.brand" class="text-red-500 text-sm mt-1">{{ validationErrors.brand[0] }}</p></div>
+          <div><label class="block font-medium">Nama Barang</label><input v-model="addForm.name" type="text" class="w-full border rounded px-3 py-2" required placeholder="Contoh: Inspiron 14, Proyektor XYZ, dll." /><p v-if="validationErrors.name" class="text-red-500 text-sm mt-1">{{ validationErrors.name[0] }}</p></div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div><label class="block font-medium">Kode Barang</label><input v-model="addForm.code" type="text" class="w-full border rounded px-3 py-2" required /><p v-if="validationErrors.code" class="text-red-500 text-sm mt-1">{{ validationErrors.code[0] }}</p></div>
             <div><label class="block font-medium">Barcode</label><input v-model="addForm.barcode" type="text" class="w-full border rounded px-3 py-2" required /><p v-if="validationErrors.barcode" class="text-red-500 text-sm mt-1">{{ validationErrors.barcode[0] }}</p></div>
           </div>
           <div>
             <label class="block font-medium">Tipe Barang</label>
-            <select v-model="addForm.type" class="w-full border rounded px-3 py-2 bg-white" required>
-              <option disabled value="">Pilih tipe...</option>
-              <option v-for="type in itemTypeOptions" :key="type.value" :value="type.value">{{ type.label }}</option>
+            <select v-model="addForm.item_type_id" class="w-full border rounded px-3 py-2 bg-white" required> <option disabled value="">Pilih tipe...</option>
+                <option v-for="type in itemTypeOptions" :key="type.value" :value="type.value">
+                  {{ type.label }}
+                </option>
             </select>
-            <p v-if="validationErrors.type" class="text-red-500 text-sm mt-1">{{ validationErrors.type[0] }}</p>
+            <p v-if="validationErrors.item_type_id" class="text-red-500 text-sm mt-1">{{ validationErrors.item_type_id[0] }}</p>
           </div>
           <div><label class="block font-medium">Kelengkapan</label><textarea v-model="addForm.accessories" class="w-full border rounded px-3 py-2"></textarea></div>
           <div class="mt-6 flex justify-end gap-4">
@@ -130,17 +134,19 @@
         <h2 class="text-xl font-bold mb-4">Edit Barang</h2>
         <form @submit.prevent="submitUpdateItem" class="space-y-4">
           <div><label class="block font-medium">Brand</label><input v-model="editForm.brand" type="text" class="w-full border rounded px-3 py-2" required /><p v-if="validationErrors.brand" class="text-red-500 text-sm mt-1">{{ validationErrors.brand[0] }}</p></div>
+          <div><label class="block font-medium">Nama Barang</label><input v-model="editForm.name" type="text" class="w-full border rounded px-3 py-2" required /><p v-if="validationErrors.name" class="text-red-500 text-sm mt-1">{{ validationErrors.name[0] }}</p></div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div><label class="block font-medium">Kode Barang</label><input v-model="editForm.code" type="text" class="w-full border rounded px-3 py-2" required /><p v-if="validationErrors.code" class="text-red-500 text-sm mt-1">{{ validationErrors.code[0] }}</p></div>
             <div><label class="block font-medium">Barcode</label><input v-model="editForm.barcode" type="text" class="w-full border rounded px-3 py-2" required /><p v-if="validationErrors.barcode" class="text-red-500 text-sm mt-1">{{ validationErrors.barcode[0] }}</p></div>
           </div>
           <div>
             <label class="block font-medium">Tipe Barang</label>
-            <select v-model="editForm.type" class="w-full border rounded px-3 py-2 bg-white" required>
-              <option disabled value="">Pilih tipe...</option>
-              <option v-for="type in itemTypeOptions" :key="type.value" :value="type.value">{{ type.label }}</option>
+            <select v-model="editForm.item_type_id" class="w-full border rounded px-3 py-2 bg-white" required> <option disabled value="">Pilih tipe...</option>
+                <option v-for="type in itemTypeOptions" :key="type.value" :value="type.value">
+                  {{ type.label }}
+                </option>
             </select>
-            <p v-if="validationErrors.type" class="text-red-500 text-sm mt-1">{{ validationErrors.type[0] }}</p>
+            <p v-if="validationErrors.item_type_id" class="text-red-500 text-sm mt-1">{{ validationErrors.item_type_id[0] }}</p>
           </div>
           <div>
               <label class="block font-medium">Status Barang</label>
@@ -195,7 +201,7 @@ export default {
       filters: { type: 'Semua', search: '', perPage: 10, page: 1 },
       pagination: {},
       showAddModal: false,
-      addForm: { brand: '', code: '', barcode: '', type: '', accessories: '', status: 'AVAILABLE' },
+      addForm: { brand: '', name: '', code: '', barcode: '', item_type_id: '', accessories: '', status: 'AVAILABLE' },
       showEditModal: false,
       editForm: {},
       editingItemId: null,
@@ -203,7 +209,7 @@ export default {
       // [DITAMBAHKAN] State untuk menampung pilihan tipe barang dari API
       itemTypeOptions: [],
       showAddTypeModal: false,
-      addTypeForm: { label: '', value: '' },
+      addTypeForm: { name: '' },
     };
   },
   watch: {
@@ -238,7 +244,7 @@ export default {
         }
     },
     openAddTypeModal() {
-      this.addTypeForm = { label: '', value: '' };
+      this.addTypeForm.name = '';
       this.validationErrors = {};
       this.showAddTypeModal = true;
     },
@@ -274,7 +280,7 @@ export default {
     },
     openAddModal() {
       this.validationErrors = {};
-      this.addForm = { brand: '', code: '', barcode: '', type: '', accessories: '', status: 'AVAILABLE' };
+      this.addForm = { brand: '', name: '', code: '', barcode: '', type: '', accessories: '', status: 'AVAILABLE' };
       this.showAddModal = true;
     },
     closeAddModal() { this.showAddModal = false; },

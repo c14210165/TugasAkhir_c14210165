@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
@@ -11,12 +12,13 @@ use App\Http\Controllers\ReturnController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\PredictionController;
-use App\Http\Controllers\AdditionalTypeController;
+use App\Http\Controllers\ItemTypeController;
 use App\Http\Controllers\EmailController;
+use App\Http\Controllers\PrintController;
 
 Route::post('/login', [AuthController::class, 'login']); 
 
-Route::middleware('auth:sanctum')->group(function () {
+// Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -91,11 +93,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/predictions/generate/{type}', [PredictionController::class, 'generate']);
 
-    Route::post('/types/add', [AdditionalTypeController::class, 'store']);
+    Route::post('/types/add', [ItemTypeController::class, 'store']);
+
+    Route::get('/print/handover/{loan}', [PrintController::class, 'handover'])->name('print.handover');
 
     Route::post('/send-email', [EmailController::class, 'send']);
 
-});
+// });
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

@@ -14,54 +14,33 @@ class AuthController extends Controller
     // Login
     public function login(Request $request)
     {
-        // 1. Validasi input dari frontend.
-        // Kita harapkan frontend mengirim satu field bernama 'login' yang bisa berisi email/username.
         $request->validate([
             'login'    => 'required|string',
             'password' => 'required',
         ]);
 
-        // 2. Tentukan tipe kredensial: apakah 'email' atau 'username'.
         $loginInput = $request->input('login');
-
-        // Gunakan fungsi PHP filter_var untuk mengecek format email.
         $fieldType = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
-        // 3. Siapkan array kredensial untuk dicocokkan.
         $credentials = [
             $fieldType => $loginInput,
             'password' => $request->input('password')
         ];
 
-        // 4. Coba lakukan otentikasi dengan kredensial yang sudah disiapkan.
         if (!Auth::attempt($credentials)) {
-            // Jika gagal, kirim response error yang lebih umum.
             return response()->json(['message' => 'Kredensial yang diberikan salah.'], 401);
         }
 
-        // 5. Jika otentikasi berhasil, lanjutkan proses.
-        // Regenerate session untuk keamanan (mencegah session fixation).
-        $request->session()->regenerate();
+        $request->session()->regenerate(); // Wajib untuk keamanan session
 
-        // Ambil data user yang berhasil login.
         $user = Auth::user();
 
-        // Tentukan halaman redirect berdasarkan role user.
-        $redirectTo = '';
-        switch ($user->role) {
-            case UserRole::PTIK: // PTIK admin
-                $redirectTo = '/request';
-                break;
-            case UserRole::TU: // TU staff
-                $redirectTo = '/tureq';
-                break;
-            case UserRole::USER: // Regular user
-            default:
-                $redirectTo = '/userreq';
-                break;
-        }
+        $redirectTo = match ($user->role) {
+            UserRole::PTIK => '/request',
+            UserRole::TU   => '/tureq',
+            default        => '/userreq',
+        };
 
-        // Kembalikan response sukses.
         return response()->json([
             'message'     => 'Login berhasil!',
             'redirect_to' => $redirectTo,
@@ -82,4 +61,3 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out']);
     }
 }
-

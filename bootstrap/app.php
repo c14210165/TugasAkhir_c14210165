@@ -13,11 +13,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Middleware untuk web (wajib agar sanctum/csrf-cookie aktif)
         $middleware->web(prepend: [
             EnsureFrontendRequestsAreStateful::class,
             HandleCors::class,
         ]);
 
+        // Middleware untuk API (optional)
         $middleware->api(prepend: [
             EnsureFrontendRequestsAreStateful::class,
             HandleCors::class,
@@ -25,5 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function ($exceptions) {
         //
+    })
+    ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule) {
+        $schedule->command('loan:reminder')->everyMinute();
     })
     ->create();

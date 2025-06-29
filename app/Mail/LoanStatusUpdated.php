@@ -10,7 +10,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use App\Models\Loan;
 
-class LoanStatusUpdated extends Mailable
+class LoanStatusUpdated extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

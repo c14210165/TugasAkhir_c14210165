@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Loan;
 use App\Models\Item;
 use App\Models\ItemType;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,15 @@ use App\Enums\ItemStatus;
 use App\Events\LoanRequested;
 use App\Events\LoanUpdated;
 
+use Illuminate\Support\Facades\Mail;
+use App\Mail\ApprovalNotification;
+use App\Mail\DeclineNotification;
+use App\Mail\CancelNotification;
+use App\Mail\NewForwardedLoanNotification;
+use App\Notifications\LoanApprovedNotification;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\LoanProcessNotification;
+
 class RequestController extends Controller
 {
     /**
@@ -26,7 +36,12 @@ class RequestController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+        
         $query = Loan::query()->with(['requester:id,name', 'createdBy:id,name,role', 'originalRequester.unit']);
+ 
 
         // --- LOGIKA BARU BERDASARKAN PERAN ---
 
@@ -82,8 +97,6 @@ class RequestController extends Controller
         $query->orderBy('created_at', 'desc');
         $loans = $query->paginate($request->query('perPage', 10));
 
-        event(new LoanRequested($loans));
-
         return response()->json($loans);
     }
 
@@ -107,7 +120,6 @@ class RequestController extends Controller
         // Lakukan update pada data loan yang ditemukan
         $loan->update($validatedData);
 
-        event(new LoanUpdated($loan));
 
         // Kirim kembali response sukses beserta data yang sudah terupdate
         return response()->json([
@@ -118,44 +130,61 @@ class RequestController extends Controller
 
     public function approve(Request $request, Loan $loan)
     {
-        // --- BAGIAN PENTING YANG DIPERBAIKI ---
-        // Muat (load) relasi yang kita butuhkan untuk pengecekan logika.
-        $loan->load('createdBy:id,role');
-        // ------------------------------------
-
+        $loan->load(['createdBy:id,role', 'originalRequester:id,name,email,unit_id', 'requester:id,email', 'itemType']);
         $user = Auth::user();
+        
         $nextStatus = null;
         $approverField = null;
         $updateData = [];
 
-        // Kondisi 1: PTIK melakukan 'fast-track' pada permohonan timnya sendiri (yang masih PENDING_UNIT)
         $isPtkFastTrack = (
             $loan->status === LoanStatus::PENDING_UNIT &&
             $user->role === UserRole::PTIK &&
-            $loan->createdBy->role === UserRole::PTIK // <-- Sekarang ini akan bekerja
+            $loan->createdBy->role === UserRole::PTIK
         );
 
         if ($isPtkFastTrack) {
-            // Jika fast-track, PTIK juga harus menugaskan barang
             $request->validate(['item_id' => 'required|exists:items,id']);
-            
+
             $nextStatus = LoanStatus::APPROVED;
             $approverField = 'ptik_approver_id';
-            // Set juga approver unit sebagai dirinya sendiri untuk kelengkapan data
-            $updateData['unit_approver_id'] = $user->id; 
+            $updateData['unit_approver_id'] = $user->id;
             $updateData['item_id'] = $request->input('item_id');
             $updateData['responded_at'] = now();
         } 
-        // Kondisi 2: Alur normal, TU menyetujui PENDING_UNIT
         elseif ($loan->status === LoanStatus::PENDING_UNIT && $user->role === UserRole::TU) {
             $nextStatus = LoanStatus::PENDING_PTIK;
             $approverField = 'unit_approver_id';
 
             if ($loan->requester->role === UserRole::USER) {
-                $updateData['requester_id'] = $user->id; // ← inilah yang perlu ditambahkan
+                $updateData['requester_id'] = $user->id;
             }
-        }
-        // Kondisi 3: Alur normal, PTIK menyetujui PENDING_PTIK
+
+            //  TU menyetujui → kirim ke semua PTIK
+            $ptiks = User::where('role', UserRole::PTIK)->get();
+            foreach ($ptiks as $ptik) {
+                Mail::to($ptik->email)->send(new NewForwardedLoanNotification(
+                    $loan->item_type,
+                    $user->name,
+                    now()->format('d-m-Y H:i')
+                ));
+
+                $ptik->notify(new LoanApprovedNotification(
+                    "Permohonan baru diteruskan oleh $user->name untuk tipe barang {$loan->item_type}."
+                ));
+            }
+
+            // TU juga kirim ke pemohon
+            Mail::to($loan->originalRequester->email)->send(new ApprovalNotification(
+                $loan->item_type,
+                $user->name,
+                now()->format('d-m-Y H:i')
+            ));
+
+            $loan->originalRequester->notify(new LoanApprovedNotification(
+                "Permohonanmu telah disetujui oleh $user->name dan diteruskan ke PTIK."
+            ));
+        } 
         elseif ($loan->status === LoanStatus::PENDING_PTIK && $user->role === UserRole::PTIK) {
             $request->validate(['item_id' => 'required|exists:items,id']);
 
@@ -163,47 +192,104 @@ class RequestController extends Controller
             $approverField = 'ptik_approver_id';
             $updateData['item_id'] = $request->input('item_id');
             $updateData['responded_at'] = now();
+
+            //  PTIK menyetujui → kirim ke user
+            Mail::to($loan->originalRequester->email)->send(new ApprovalNotification(
+                $loan->item_type,
+                $user->name,
+                now()->format('d-m-Y H:i')
+            ));
+
+            $loan->originalRequester->notify(new LoanApprovedNotification(
+                "Permohonanmu untuk tipe barang {$loan->item_type} telah disetujui oleh $user->name."
+            ));
+
+            //  PTIK menyetujui → kirim ke TU di unit yang sama
+            $unitTus = User::where('role', UserRole::TU)
+                ->where('unit_id', $loan->originalRequester->unit_id)
+                ->get();
+
+            foreach ($unitTus as $tu) {
+                Mail::to($tu->email)->send(new ApprovalNotification(
+                    $loan->item_type,
+                    $user->name,
+                    now()->format('d-m-Y H:i')
+                ));
+
+                $tu->notify(new LoanApprovedNotification(
+                    "Permohonan dari {$loan->originalRequester->name} telah disetujui oleh $user->name."
+                ));
+            }
         }
 
         if (is_null($nextStatus)) {
             return response()->json(['message' => 'Anda tidak memiliki hak untuk menyetujui permohonan pada tahap ini.'], 403);
         }
 
-        // Gabungkan semua data yang akan di-update
         $updateData['status'] = $nextStatus;
         $updateData[$approverField] = $user->id;
-
         $loan->update($updateData);
 
-        // Jika persetujuan final (status menjadi APPROVED), update juga status item
         if ($nextStatus === LoanStatus::APPROVED) {
             Item::find($request->input('item_id'))->update(['status' => ItemStatus::BORROWED->value]);
         }
 
-        event(new LoanUpdated($loan));
-        
+
         return response()->json(['message' => 'Permohonan berhasil diproses.']);
     }
 
     public function decline(Request $request, Loan $loan)
     {
-        // Logika untuk decline tidak perlu serumit approve, karena bisa menolak di tahap mana saja.
-        // Anda hanya perlu memastikan user yang login punya hak (misal: TU atau PTIK).
         $user = Auth::user();
 
         if (!in_array($user->role, [UserRole::TU, UserRole::PTIK])) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses.'], 403);
         }
-        
+
         $request->validate(['rejection_reason' => 'nullable|string|max:255']);
-        
+
+        $field = $user->role === UserRole::PTIK ? 'ptik_approver_id' : 'unit_approver_id';
+
         $loan->update([
             'status' => LoanStatus::REJECTED,
             'rejection_reason' => $request->input('rejection_reason'),
-            $user->role === UserRole::PTIK ? 'ptik_approver_id' : 'unit_approver_id' => $user->id
+            $field => $user->id
         ]);
 
-        event(new LoanUpdated($loan));
+        $loan->load(['requester:id,email', 'originalRequester:id,email,unit_id', 'itemType']);
+        
+
+        // Email ke user (selalu)
+        Mail::to($loan->originalRequester->email)->send(new DeclineNotification(
+            $loan->item_type,
+            $user->name,
+            $request->input('rejection_reason'),
+            now()->format('d-m-Y H:i')
+        ));
+
+        $loan->originalRequester->notify(new LoanProcessNotification(
+            "Permohonanmu ditolak oleh $user->name. Alasan: " . ($request->input('rejection_reason') ?? '-')
+        ));
+
+        // Jika PTIK yang menolak → juga kirim ke TU di unit yang sama
+        if ($user->role === UserRole::PTIK) {
+            $unitTus = User::where('role', UserRole::TU)
+                ->where('unit_id', $loan->originalRequester->unit_id)
+                ->get();
+
+            foreach ($unitTus as $tu) {
+                Mail::to($tu->email)->send(new DeclineNotification(
+                    $loan->item_type,
+                    $user->name,
+                    $request->input('rejection_reason'),
+                    now()->format('d-m-Y H:i')
+                ));
+
+                $tu->notify(new LoanProcessNotification(
+                    "Permohonan dari {$loan->originalRequester->name} ditolak oleh $user->name."
+                ));
+            }
+        }
 
         return response()->json(['message' => 'Permohonan telah ditolak.']);
     }
@@ -213,18 +299,76 @@ class RequestController extends Controller
      */
     public function cancel(Loan $loan)
     {
-        // Hanya user yang membuat yang bisa membatalkan, dan hanya jika masih pending
-        if (Auth::id() !== $loan->created_by_id) {
+        $user = Auth::user();
+
+        if ($user->id !== $loan->created_by_id) {
             return response()->json(['message' => 'Anda tidak bisa membatalkan permohonan orang lain.'], 403);
         }
+
         if (!in_array($loan->status, [LoanStatus::PENDING_UNIT, LoanStatus::PENDING_PTIK])) {
             return response()->json(['message' => 'Permohonan yang sudah diproses tidak bisa dibatalkan.'], 400);
         }
 
         $loan->update(['status' => LoanStatus::CANCELLED]);
+        $loan->load(['originalRequester:id,email,unit_id', 'itemType']);
 
-        event(new LoanUpdated($loan));
-        
+
+        if ($user->role === UserRole::USER) {
+            $tus = User::where('role', UserRole::TU)->get();
+            foreach ($tus as $tu) {
+                Mail::to($tu->email)->send(new CancelNotification(
+                    $loan->item_type,
+                    $user->name,
+                    now()->format('d-m-Y H:i')
+                ));
+
+                // Notifikasi database ke TU
+                $tu->notify(new LoanProcessNotification(
+                    "Permohonan dari {$user->name} dibatalkan oleh pemohon."
+                ));
+            }
+        } 
+        elseif ($user->role === UserRole::TU) {
+            Mail::to($loan->originalRequester->email)->send(new CancelNotification(
+                $loan->item_type,
+                $user->name,
+                now()->format('d-m-Y H:i')
+            ));
+
+            // Notifikasi database ke pemohon
+            $loan->originalRequester->notify(new LoanProcessNotification(
+                "Permohonanmu dibatalkan oleh TU: {$user->name}."
+            ));
+        } 
+        elseif ($user->role === UserRole::PTIK) {
+            Mail::to($loan->originalRequester->email)->send(new CancelNotification(
+                $loan->item_type,
+                $user->name,
+                now()->format('d-m-Y H:i')
+            ));
+
+            $loan->originalRequester->notify(new LoanProcessNotification(
+                "Permohonanmu dibatalkan oleh PTIK: {$user->name}."
+            ));
+
+            $tus = User::where('role', UserRole::TU)
+                ->where('unit_id', $loan->originalRequester->unit_id)
+                ->get();
+
+            foreach ($tus as $tu) {
+                Mail::to($tu->email)->send(new CancelNotification(
+                    $loan->item_type,
+                    $user->name,
+                    now()->format('d-m-Y H:i')
+                ));
+
+                // Notifikasi database ke TU
+                $tu->notify(new LoanProcessNotification(
+                    "Permohonan dari {$loan->originalRequester->name} dibatalkan oleh PTIK: {$user->name}."
+                ));
+            }
+        }
+
         return response()->json(['message' => 'Permohonan berhasil dibatalkan.']);
     }
 

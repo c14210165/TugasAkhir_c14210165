@@ -9,8 +9,9 @@ import axios from 'axios';
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
-axios.defaults.baseURL = 'http://localhost:8000';
+axios.defaults.baseURL = '/';
 axios.defaults.withCredentials = true;
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
 const app = createApp(App);
 

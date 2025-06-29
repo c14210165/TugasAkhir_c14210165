@@ -34,18 +34,44 @@
         </button>
 
         <!-- Dropdown Notifikasi -->
-        <div v-if="showDropdown" class="absolute right-0 top-12 bg-white shadow-lg rounded-md w-64 p-4 z-50">
+      <div
+          v-if="showDropdown"
+          class="absolute right-0 top-12 bg-white shadow-lg rounded-md w-72 p-4 z-50"
+        >
           <div class="flex justify-between items-center mb-2">
             <h3 class="font-semibold text-gray-700">Notifikasi</h3>
-            <button @click="showDropdown = false" class="text-gray-600 hover:text-red-500 font-bold">✖</button>
+            <button @click="showDropdown = false" class="text-gray-600 hover:text-red-500 font-bold">
+              ✖
+            </button>
           </div>
-          <ul class="max-h-40 overflow-y-auto">
-            <li v-for="notif in notifications" :key="notif.id" class="p-2 border-b text-gray-600">
-              {{ notif.message }}
+
+          <ul class="max-h-60 overflow-y-auto divide-y divide-gray-200">
+            <li
+              v-if="notifications.length === 0"
+              class="text-gray-500 text-sm py-2 text-center"
+            >
+              Tidak ada notifikasi.
+            </li>
+            <li
+              v-for="notif in notifications"
+              :key="notif.id"
+              class="py-2 text-gray-700"
+            >
+              <div class="text-sm font-medium">{{ notif.data.message }}</div>
+              <div class="text-xs text-gray-400">
+                {{ new Date(notif.created_at).toLocaleString('id-ID') }}
+              </div>
             </li>
           </ul>
-          <button @click="clearNotifications" class="mt-2 text-blue-600 hover:underline text-sm">Hapus Notifikasi</button>
+
+          <button
+            @click="clearNotifications"
+            class="mt-3 text-blue-600 hover:underline text-sm w-full text-center"
+          >
+            Hapus Semua Notifikasi
+          </button>
         </div>
+
 
         <!-- Toggle Dark Mode -->
         <button @click="toggleDarkMode" class="text-gray-600 hover:text-gray-800">
@@ -152,12 +178,8 @@ export default {
     return {
       logo,
       sidebarOpen: false,
-      notifCount: 3,
-      notifications: [
-        { id: 1, message: 'Permohonan baru telah diterima' },
-        { id: 2, message: 'Barang yang kamu pinjam harus dikembalikan' },
-        { id: 3, message: 'Sistem akan diperbarui malam ini' },
-      ],
+      notifCount: 0,
+      notifications: [],
       showDropdown: false,
       showProfileDropdown: false,
       isDarkMode: false,
@@ -187,6 +209,7 @@ export default {
   mounted() {
     if (!this.userRole) {
       this.$store.dispatch('fetchUserData');
+      this.fetchNotifications();
     }
   },
   methods: {
@@ -198,9 +221,22 @@ export default {
       this.showProfileDropdown = !this.showProfileDropdown;
       if (this.showProfileDropdown) this.showDropdown = false;
     },
-    clearNotifications() {
-      this.notifications = [];
-      this.notifCount = 0;
+    async fetchNotifications() {
+      try {
+        const response = await axios.get('/notifications');
+        this.notifications = response.data;
+        this.notifCount = this.notifications.length;
+      } catch (error) {
+        console.error('Gagal mengambil notifikasi:', error);
+      }
+    },
+    async clearNotifications() {
+      try {
+        await axios.delete('/notifications');
+        this.notifications = [];
+      } catch (error) {
+        console.error('Gagal menghapus notifikasi:', error);
+      }
     },
     toggleDarkMode() {
       this.isDarkMode = !this.isDarkMode;

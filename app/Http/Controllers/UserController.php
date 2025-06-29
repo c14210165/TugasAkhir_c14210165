@@ -73,11 +73,22 @@ class UserController extends Controller
 
     public function getSelectionList()
     {
-        // Ambil semua user, tapi hanya kolom id dan name untuk efisiensi
-        $users = User::query()
-                       ->select('id', 'name')
-                       ->orderBy('name', 'asc') // Urutkan berdasarkan nama
-                       ->get();
+        $loggedInUser = Auth::user();
+
+        // Mulai query
+        $query = User::query()->select('id', 'name');
+
+        // --- LOGIKA BARU BERDASARKAN PERAN ---
+        if ($loggedInUser->role === UserRole::USER) {
+            // Jika yang login adalah user biasa, hanya tampilkan dirinya sendiri
+            $query->where('id', $loggedInUser->id);
+        } else {
+            // Jika admin (TU/PTIK), tampilkan semua user dan urutkan berdasarkan nama
+            $query->orderBy('name', 'asc');
+        }
+
+        // Ambil hasilnya
+        $users = $query->get();
 
         return response()->json($users);
     }

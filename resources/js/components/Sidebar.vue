@@ -21,6 +21,7 @@
 
 <script>
 import {
+  Squares2X2Icon,
   ClipboardDocumentListIcon,
   ClockIcon,
   ArrowUturnLeftIcon,
@@ -41,6 +42,7 @@ export default {
       // Define menu items per role
       menuItemsByRole: {
         PTIK: [
+          { name: 'Dashboard', icon: Squares2X2Icon },
           { name: 'Request', icon: ClipboardDocumentListIcon },
           { name: 'Loan', icon: ClockIcon },
           { name: 'Return', icon: ArrowUturnLeftIcon },

@@ -251,6 +251,7 @@ export default {
       tabs: [
         { name: 'Menunggu Unit', status: 'PENDING_UNIT' },
         { name: 'Menunggu Konfirmasi PTIK', status: 'PENDING_PTIK' },
+        { name: 'Diterima', status: 'APPROVED' },
         { name: 'Ditolak', status: 'REJECTED' },
         { name: 'Dibatalkan', status: 'CANCELLED' },
       ],
@@ -278,6 +279,7 @@ export default {
       showEditModal: false,
       editForm: {},
       editingRequestId: null,
+      intervalId: null,
     };
   },
   
@@ -288,8 +290,8 @@ export default {
     'filters.perPage'() { this.filters.page = 1; this.fetchRequests(); },
   },
   methods: {
-    async fetchRequests() {
-      this.loading = true;
+    async fetchRequests(silent = false) {
+      if (!silent) this.loading = true;
       try {
         let apiParams = { ...this.filters };
         if (apiParams.type === 'Semua') {
@@ -619,6 +621,12 @@ export default {
     this.fetchCurrentUser();
     this.fetchItemTypeOptions();
     this.fetchUserSelectionList();
+
+    this.intervalId = setInterval(() => {
+      if (!this.showAddModal && !this.showEditModal && !this.showAssignModal) {
+        this.fetchRequests(true);
+      }
+    }, 5000); 
   },
 };
 </script>

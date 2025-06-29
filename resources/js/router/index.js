@@ -13,6 +13,7 @@ import TUReq from '../views/TUReqDashboard.vue';
 import TULoan from '../views/TULoanDashboard.vue';
 import UserReq from '../views/UserReqDashboard.vue';
 import UserLoan from '../views/UserLoanDashboards.vue';
+import Dashboard from '../views/Dashboard.vue';
 
 const routes = [
   { path: '/', redirect: '/login' },
@@ -29,6 +30,7 @@ const routes = [
   { path: '/tuloan', component: TULoan },
   { path: '/userreq', component: UserReq },
   { path: '/userloan', component: UserLoan },
+  { path: '/dashboard', component: Dashboard },
 ];
 
 const router = createRouter({

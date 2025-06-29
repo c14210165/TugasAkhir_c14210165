@@ -2,9 +2,6 @@
   <nav class="flex items-center justify-between bg-white shadow-md px-6 py-4 relative">
     <!-- Bagian Kiri -->
     <div class="flex items-center space-x-6">
-      <button class="text-gray-600 hover:text-gray-800">☰</button>
-      <a href="#" class="text-gray-700 hover:text-blue-600">FAQ</a>
-      <a href="#" class="text-gray-700 hover:text-blue-600">Panduan</a>
     </div>
 
     <!-- Bagian Kanan (Notifikasi, Dark Mode, Akun) -->
@@ -24,15 +21,21 @@
           <button @click="showDropdown = false" class="text-gray-600 hover:text-red-500 font-bold">✖</button>
         </div>
         <ul class="max-h-40 overflow-y-auto">
-          <li v-for="notif in notifications" :key="notif.id" class="p-2 border-b text-gray-600">{{ notif.message }}</li>
+          <li
+            v-for="notif in notifications"
+            :key="notif.id"
+            class="p-2 border-b text-gray-600"
+          >
+            {{ notif.data.message }}
+          </li>
         </ul>
-        <button @click="clearNotifications" class="mt-2 text-blue-600 hover:underline text-sm">Hapus Notifikasi</button>
+        <button
+          @click="clearNotifications"
+          class="mt-2 text-blue-600 hover:underline text-sm"
+        >
+          Hapus Notifikasi
+        </button>
       </div>
-
-      <!-- Toggle Dark Mode -->
-      <button @click="toggleDarkMode" class="text-gray-600 hover:text-gray-800">
-        {{ isDarkMode ? '🌙' : '☀️' }}
-      </button>
 
       <!-- Informasi Akun dengan Dropdown Profil -->
       <div class="relative">
@@ -64,29 +67,33 @@ import { mapGetters } from 'vuex';
 export default {
   data() {
     return {
-      notifCount: 3,
-      notifications: [
-        { id: 1, message: "Permohonan baru telah diterima" },
-        { id: 2, message: "Barang yang kamu pinjam harus dikembalikan" },
-        { id: 3, message: "Sistem akan diperbarui malam ini" }
-      ],
+      notifications: [],
+      notifCount: 0,
       showDropdown: false,
       showProfileDropdown: false,
       isDarkMode: false,
     };
   },
   computed: {
-    ...mapGetters(['userName']),  // Mengambil nama pengguna dari store
+    ...mapGetters(['userName']), // dari Vuex
   },
   mounted() {
-    // Ambil data pengguna ketika komponen dimuat
     this.$store.dispatch('fetchUserData');
+    this.fetchNotifications();
+    this.pollingInterval = setInterval(() => {
+      this.fetchNotifications();
+    }, 10000); // 10 detik
+  },
+  beforeUnmount() {
+    // Bersihkan interval saat komponen di-unmount
+    clearInterval(this.pollingInterval);
   },
   methods: {
     toggleDropdown() {
       this.showDropdown = !this.showDropdown;
       if (this.showDropdown) {
         this.showProfileDropdown = false;
+        this.fetchNotifications(); // Segarkan notifikasi saat dibuka
       }
     },
     toggleProfileDropdown() {
@@ -95,26 +102,35 @@ export default {
         this.showDropdown = false;
       }
     },
-    clearNotifications() {
-      this.notifications = [];
-      this.notifCount = 0;
+    async fetchNotifications() {
+      try {
+        const response = await this.$axios.get('/api/notifications', { withCredentials: true });
+        this.notifications = response.data;
+        this.notifCount = this.notifications.length;
+      } catch (error) {
+        console.error('Gagal mengambil notifikasi:', error);
+      }
+    },
+    async clearNotifications() {
+      try {
+        await this.$axios.delete('/api/notifications', { withCredentials: true });
+        this.notifications = [];
+        this.notifCount = 0;
+      } catch (error) {
+        console.error('Gagal menghapus notifikasi:', error);
+      }
     },
     toggleDarkMode() {
       this.isDarkMode = !this.isDarkMode;
       document.documentElement.classList.toggle('dark');
     },
-    logout() {
-      this.$axios.post('/api/logout', {}, { withCredentials: true })
-        .then(() => {
-          // Bersihkan user lokal
-          this.user = null;
-
-          // Redirect ke halaman login atau home
-          this.$router.push('/login');
-        })
-        .catch(error => {
-          console.error('Logout gagal:', error);
-        });
+    async logout() {
+      try {
+        await this.$axios.post('/api/logout', {}, { withCredentials: true });
+        this.$router.push('/login');
+      } catch (error) {
+        console.error('Logout gagal:', error);
+      }
     }
   }
 };

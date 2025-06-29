@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ItemController;
@@ -15,10 +16,12 @@ use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\ItemTypeController;
 use App\Http\Controllers\EmailController;
 use App\Http\Controllers\PrintController;
+use App\Http\Controllers\LoanReminderController;
+use App\Http\Controllers\DashboardController;
 
 Route::post('/login', [AuthController::class, 'login']); 
 
-// Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -99,9 +102,22 @@ Route::post('/login', [AuthController::class, 'login']);
 
     Route::post('/send-email', [EmailController::class, 'send']);
 
-// });
+    Route::get('/notifications', function () {
+        return Auth::user()->notifications;
+    });
+
+    Route::delete('/notifications', function () {
+        Auth::user()->notifications()->delete();
+        return response()->json(['message' => 'Notifikasi dihapus.']);
+    });
+
+    Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
+    
+    Route::get('/loan/reminder-check', [LoanReminderController::class, 'checkExpiringOrLateLoans']);
+});
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/me', [AuthController::class, 'me']);
+    // Route::post('/logout', [AuthController::class, 'logout']);
+    // Route::get('/me', [AuthController::class, 'me']);
+    
 });

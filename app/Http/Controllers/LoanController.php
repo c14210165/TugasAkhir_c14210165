@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Loan;
 use App\Models\Item;
+use App\Models\User;
 use App\Models\ItemType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,10 @@ use Illuminate\Support\Facades\DB;
 use App\Enums\ItemStatus;
 use App\Enums\LoanStatus;
 use App\Enums\UserRole;
+
+use App\Mail\NewSubmissionNotification;
+use Illuminate\Support\Facades\Mail;
+use App\Notifications\LoanSubmittedNotification;
 
 class LoanController extends Controller
 {
@@ -101,37 +106,96 @@ class LoanController extends Controller
 
     public function store(Request $request)
     {
-        // 1. Validasi semua input yang dikirim dari form Vue
         $validatedData = $request->validate([
-            // 'exists:users,id' memastikan user yang dipilih benar-benar ada di database
             'requester_id' => 'required|exists:users,id', 
             'original_requester_id' => 'required|exists:users,id',
-            
-            // Validasi tipe barang harus salah satu dari yang ada di Enum
-            'item_type'   => 'required',
-
+            'item_type' => 'required',
             'location' => 'required|string|max:1000',
             'purpose' => 'required|string|max:2000',
-            
-            // Validasi tanggal & waktu
             'start_at' => 'required|date',
-            'end_at'   => 'required|date|after_or_equal:start_at', // Tgl selesai harus setelah atau sama dengan tgl mulai
+            'end_at' => 'required|date|after_or_equal:start_at',
         ]);
 
-        // 2. Tambahkan data yang di-generate oleh server, bukan dari input user
-        $validatedData['created_by_id'] = Auth::id(); // Ambil ID user yang sedang login
-        $validatedData['status'] = LoanStatus::PENDING_UNIT->value; // Set status awal
+        $user = Auth::user();
+        $validatedData['created_by_id'] = $user->id;
+        $validatedData['status'] = LoanStatus::PENDING_UNIT->value;
 
-        // 3. Simpan data yang sudah tervalidasi dan lengkap ke database
         $loan = Loan::create($validatedData);
+        $loan->load(['requester:id,name,email,unit_id', 'originalRequester:id,name,email,unit_id', 'createdBy:id,name,role', 'itemType']);
 
-        $loan->load(['requester:id,name', 'createdBy:id,name,role', 'itemType']);
+        // === Pengiriman email disesuaikan dengan peran ===
+        if ($user->role === UserRole::USER) {
+            // USER → kirim ke semua TU
+            $unitTus = User::where('role', UserRole::TU)
+                ->where('unit_id', $loan->originalRequester->unit_id)
+                ->get();
 
-        // 4. Kirim kembali response sukses beserta data yang baru dibuat
+            foreach ($unitTus as $tu) {
+                Mail::to($tu->email)->send(new NewSubmissionNotification(
+                    $loan->item_type,
+                    $user->name,
+                    now()->format('d-m-Y H:i')
+                ));
+
+                $tu->notify(new LoanSubmittedNotification(
+                    $loan->item_type,
+                    $user->name
+                ));
+            }
+        }
+        elseif ($user->role === UserRole::TU) {
+            $target = $loan->originalRequester;
+            
+            // TU → buat permohonan untuk orang lain → kirim ke user
+            Mail::to($loan->originalRequester->email)->send(new NewSubmissionNotification(
+                $loan->item_type,
+                $user->name,
+                now()->format('d-m-Y H:i')
+            ));
+
+            $target->notify(new LoanSubmittedNotification(
+                $loan->item_type,
+                $user->name
+            ));
+        }
+        elseif ($user->role === UserRole::PTIK) {
+            $target = $loan->originalRequester;
+
+            // PTIK → kirim ke user dan TU yang satu unit
+            Mail::to($loan->originalRequester->email)->send(new NewSubmissionNotification(
+                $loan->item_type,
+                $user->name,
+                now()->format('d-m-Y H:i')
+            ));
+
+            $target->notify(new LoanSubmittedNotification(
+                $loan->item_type,
+                $user->name
+            ));
+
+
+            $unitTus = User::where('role', UserRole::TU)
+                ->where('unit_id', $loan->originalRequester->unit_id)
+                ->get();
+
+            foreach ($unitTus as $tu) {
+                Mail::to($tu->email)->send(new NewSubmissionNotification(
+                    $loan->item_type,
+                    $user->name,
+                    now()->format('d-m-Y H:i')
+                ));
+
+                $tu->notify(new LoanSubmittedNotification(
+                    $loan->item_type,
+                    $user->name
+                ));
+            }
+        }
+
         return response()->json([
             'message' => 'Permohonan berhasil diajukan!',
-            'loan' => $loan // Muat relasi agar bisa langsung ditampilkan jika perlu
-        ], 201); // 201 Created adalah status code standar untuk POST yang sukses
+            'loan' => $loan
+        ], 201);
     }
 
     /**

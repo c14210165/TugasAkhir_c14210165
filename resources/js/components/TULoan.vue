@@ -187,6 +187,7 @@ export default {
       showDetailModal: false,
       selectedLoanForDetail: null,
       itemTypeOptions: [],
+      intervalId: null,
     };
   },
   watch: {
@@ -196,8 +197,8 @@ export default {
     'filters.type': function() { this.filters.page = 1; this.fetchLoans(); },
   },
   methods: {
-    async fetchLoans() {
-      this.loading = true;
+    async fetchLoans(silent = false) {
+      if (!silent) this.loading = true;
       try {
         let apiParams = { ...this.filters };
         if (apiParams.type === 'Semua') {
@@ -383,6 +384,15 @@ export default {
   created() {
     this.fetchLoans();
     this.fetchItemTypeOptions();
+
+    this.intervalId = setInterval(() => {
+      this.fetchLoans(true);
+    }, 5000);
+  },
+  unmounted() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
   },
 };
 </script>

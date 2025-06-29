@@ -279,6 +279,7 @@ export default {
       showDetailModal: false,
       selectedLoanForDetail: null,
       itemTypeOptions: [],
+      intervalId: null,
     };
   },
   watch: {
@@ -286,10 +287,11 @@ export default {
     'filters.perPage': function() { this.filters.page = 1; this.fetchLoans(); },
     'filters.status': function() { this.filters.page = 1; this.fetchLoans(); },
     'filters.type': function() { this.filters.page = 1; this.fetchLoans(); },
+    'filters.page': function() { this.fetchLoans(); }
   },
   methods: {
-    async fetchLoans() {
-      this.loading = true;
+    async fetchLoans(silent = false) {
+      if (!silent) this.loading = true;
       try {
         let apiParams = { ...this.filters };
         // Jika filter tipenya 'Semua', hapus dari parameter agar API mengembalikan semua tipe
@@ -403,9 +405,6 @@ export default {
                 <!-- Header: Logo dan Judul -->
                 <div class="flex items-center pb-2 mb-2">
                     <!-- Ganti div placeholder ini dengan tag <img> untuk logo Anda -->
-                    <div class="w-20 h-20 flex-shrink-0 flex items-center justify-center mr-4">
-                        <img src="https://www.pcu.ac.id/wp-content/uploads/2023/08/logo-pcu-new.png" alt="Logo Universitas" class="object-contain h-full w-full" onerror="this.style.display='none'; this.parentElement.innerHTML='<p class=\\'text-gray-400 text-xs text-center\\'>Logo</p>';">
-                    </div>
                     <div class="w-full text-center border-b-4 border-black">
                         <h1 class="text-lg font-bold">FORM BARANG KELUAR/PEMINJAMAN</h1>
                         <h2 class="text-md font-semibold">PUSAT TEKNOLOGI INFORMASI DAN KOMUNIKASI</h2>
@@ -487,31 +486,85 @@ export default {
 
             <!-- FORMULIR KEDUA (DUPLIKAT) -->
             <div class="form-container">
-                <!-- Kontennya sama persis dengan form pertama -->
+                <!-- Header: Logo dan Judul -->
                 <div class="flex items-center pb-2 mb-2">
-                    <div class="w-20 h-20 flex-shrink-0 flex items-center justify-center mr-4">
-                         <img src="https://upload.wikimedia.org/wikipedia/id/thumb/9/90/Logo_UPH.png/1200px-Logo_UPH.png" alt="Logo Universitas" class="object-contain h-full w-full" onerror="this.style.display='none'; this.parentElement.innerHTML='<p class=\\'text-gray-400 text-xs text-center\\'>Logo</p>';">
-                    </div>
+                    <!-- Ganti div placeholder ini dengan tag <img> untuk logo Anda -->
                     <div class="w-full text-center border-b-4 border-black">
                         <h1 class="text-lg font-bold">FORM BARANG KELUAR/PEMINJAMAN</h1>
                         <h2 class="text-md font-semibold">PUSAT TEKNOLOGI INFORMASI DAN KOMUNIKASI</h2>
                     </div>
                 </div>
+
+                <!-- Tabel Metadata Dokumen -->
                 <table class="w-full border-collapse border border-black text-xs mb-4">
-                    <thead><tr class="bg-gray-200 text-center font-bold"><th class="border border-black px-2 py-1">No. Dokumen</th><th class="border border-black px-2 py-1">No. Revisi</th><th class="border border-black px-2 py-1">Tanggal Berlaku</th><th class="border border-black px-2 py-1">Halaman</th></tr></thead>
-                    <tbody><tr class="text-center"><td class="border border-black px-2 py-1">F02-PM.01-PTIK-UKP</td><td class="border border-black px-2 py-1">00</td><td class="border border-black px-2 py-1">15-05-2020</td><td class="border border-black px-2 py-1">1 dari 1</td></tr></tbody>
+                    <thead>
+                        <tr class="bg-gray-200 text-center font-bold">
+                            <th class="border border-black px-2 py-1">No. Dokumen</th>
+                            <th class="border border-black px-2 py-1">No. Revisi</th>
+                            <th class="border border-black px-2 py-1">Tanggal Berlaku</th>
+                            <th class="border border-black px-2 py-1">Halaman</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="text-center">
+                            <td class="border border-black px-2 py-1">F02-PM.01-PTIK-UKP</td>
+                            <td class="border border-black px-2 py-1">00</td>
+                            <td class="border border-black px-2 py-1">15-05-2020</td>
+                            <td class="border border-black px-2 py-1">1 dari 1</td>
+                        </tr>
+                    </tbody>
                 </table>
+
+                <!-- Detail Peminjaman -->
                 <table class="w-full text-xs mb-4">
-                    <tr><td class="w-1/2 py-1 align-top"><strong>Tgl. Ambil:</strong> ${this.formatDate(loan.borrowed_at)}</td><td class="w-1/2 py-1 align-top"><strong>Peminjam:</strong> ${loan.requester.name}</td></tr>
-                    <tr><td class="w-1/2 py-1 align-top"><strong>Jadwal Pinjam:</strong> ${this.formatDate(loan.start_at)} s/d ${this.formatDate(loan.end_at)}</td><td class="w-1/2 py-1 align-top"><strong>Keperluan:</strong> ${loan.purpose}</td></tr>
+                    <tr>
+                        <td class="w-1/2 py-1 align-top"><strong>Tgl. Ambil:</strong> ${this.formatDate(loan.borrowed_at)}</td>
+                        <td class="w-1/2 py-1 align-top"><strong>Peminjam:</strong> ${loan.requester.name}</td>
+                    </tr>
+                    <tr>
+                        <td class="w-1/2 py-1 align-top"><strong>Jadwal Pinjam:</strong> ${this.formatDate(loan.start_at)} s/d ${this.formatDate(loan.end_at)}</td>
+                        <td class="w-1/2 py-1 align-top"><strong>Keperluan:</strong> ${loan.purpose}</td>
+                    </tr>
                 </table>
+
+                <!-- Tabel Item yang Dipinjam -->
                 <table class="w-full border-collapse border border-black text-xs">
-                    <thead><tr class="bg-gray-200 font-bold text-center"><th class="border border-black px-2 py-1">No Order</th><th class="border border-black px-2 py-1">Kode Barang</th><th class="border border-black px-2 py-1">No Laptop</th><th class="border border-black px-2 py-1">Merk Barang</th><th class="border border-black px-2 py-1 w-2/5">Kelengkapan</th></tr></thead>
-                    <tbody><tr><td class="border border-black px-2 py-1 text-center">${loan.id}</td><td class="border border-black px-2 py-1 text-center">${loan.item.code}</td><td class="border border-black px-2 py-1 text-center">${loan.item.asset_tag || 'N/A'}</td><td class="border border-black px-2 py-1">${loan.item.brand}</td><td class="border border-black px-2 py-1">${loan.item.accessories || '-'}</td></tr></tbody>
+                    <thead>
+                        <tr class="bg-gray-200 font-bold text-center">
+                            <th class="border border-black px-2 py-1">No Order</th>
+                            <th class="border border-black px-2 py-1">Kode Barang</th>
+                            <!-- Kolom "No Laptop" ditambahkan di sini -->
+                            <th class="border border-black px-2 py-1">No Laptop</th> 
+                            <th class="border border-black px-2 py-1">Merk Barang</th>
+                            <th class="border border-black px-2 py-1 w-2/5">Kelengkapan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="border border-black px-2 py-1 text-center">${loan.id}</td>
+                            <td class="border border-black px-2 py-1 text-center">${loan.item.barcode}</td>
+                            <!-- Pastikan objek 'loan.item' memiliki properti untuk "No Laptop", contohnya 'asset_tag' -->
+                            <td class="border border-black px-2 py-1 text-center">${loan.item.code}</td>
+                            <td class="border border-black px-2 py-1">${loan.item.brand}</td>
+                            <td class="border border-black px-2 py-1">${loan.item.accessories || '-'}</td>
+                        </tr>
+                    </tbody>
                 </table>
+
+                <!-- Area Tanda Tangan -->
                 <div class="mt-8 flex justify-between text-xs text-center">
-                    <div><p>Mengetahui,</p><div class="mt-16"><p>(${loan.checked_out_by.name || '.....................'})</p></div></div>
-                    <div><p>Peminjam,</p><div class="mt-16"><p>(${loan.requester.name || '.....................'})</p></div></div>
+                    <div>
+                        <p>Mengetahui,</p>
+                        <div class="mt-16">
+                            <p>(${loan.checked_out_by.name || '.....................'})</p>
+                        </div>
+                    </div>
+                    <div>
+                        <p>Peminjam,</p>
+                        <div class="mt-16">
+                            <p>(${loan.requester.name || '.....................'})</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </body>
@@ -663,6 +716,15 @@ export default {
   created() {
     this.fetchLoans();
     this.fetchItemTypeOptions();
+
+    this.intervalId = setInterval(() => {
+      this.fetchLoans(true);
+    }, 5000);
+  },
+  unmounted() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
   },
 };
 </script>

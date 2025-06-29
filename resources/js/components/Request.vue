@@ -266,6 +266,7 @@ export default {
       showEditModal: false,
       editForm: {},
       editingRequestId: null,
+      intervalId: null,
     };
   },
   watch: {
@@ -286,8 +287,8 @@ export default {
     },
   },
   methods: {
-    async fetchRequests() {
-      this.loading = true;
+    async fetchRequests(silent = false) {
+      if (!silent) this.loading = true;
       try {
         let apiParams = { ...this.filters };
         if (apiParams.type === 'Semua') {
@@ -617,6 +618,15 @@ export default {
     this.fetchCurrentUser();
     this.fetchUserSelectionList();
     this.fetchItemTypeOptions();
+
+    this.intervalId = setInterval(() => {
+      this.fetchRequests(true);
+    }, 5000);
+  },
+  unmounted() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
   },
 };
 </script>
